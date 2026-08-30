@@ -29,6 +29,9 @@ export function ResultsView({
               } ${answer.id === selectedAnswerId ? "selected" : ""}`}
               key={answer.id}
             >
+              {answer.id === results.correctAnswerId && (
+                <small className="correct-badge">✓ Correct answer</small>
+              )}
               <span>{answer.text}</span>
               <strong>{votes.get(answer.id) ?? 0}</strong>
             </div>

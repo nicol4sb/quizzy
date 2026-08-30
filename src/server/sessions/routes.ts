@@ -210,8 +210,12 @@ export async function registerSessionRoutes(
       ? await currentQuestion(database, session.id)
       : undefined;
     const submittedAnswer = question
-      ? await database.query<{ answer_option_id: string }>(
-          `SELECT answer_option_id
+      ? await database.query<{
+          answer_option_id: string;
+          is_correct: boolean;
+          points_awarded: number;
+        }>(
+          `SELECT answer_option_id, is_correct, points_awarded
              FROM answer_submissions
             WHERE question_round_id = $1 AND player_id = $2`,
           [question.roundId, player.id],
@@ -222,6 +226,13 @@ export async function registerSessionRoutes(
       player: { id: player.id, nickname: player.nickname },
       currentQuestion: question,
       submittedAnswerId: submittedAnswer?.rows[0]?.answer_option_id,
+      playerResult: ["RESULTS", "FINISHED"].includes(session.state)
+        ? {
+            answerId: submittedAnswer?.rows[0]?.answer_option_id,
+            isCorrect: submittedAnswer?.rows[0]?.is_correct ?? false,
+            pointsAwarded: submittedAnswer?.rows[0]?.points_awarded ?? 0,
+          }
+        : undefined,
       results:
         session.state === "RESULTS"
           ? await questionResults(database, session.id)

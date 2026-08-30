@@ -176,6 +176,32 @@ describe("quiz authoring", () => {
     expect(loaded.json().quiz.title).toBe(quizInput.title);
   });
 
+  it("rejects titles and questions that are too long for presentation", async () => {
+    const cookie = await register("creator@example.com");
+    const longTitle = await app.inject({
+      method: "POST",
+      url: "/api/quizzes",
+      headers: { cookie },
+      payload: { ...quizInput, title: "T".repeat(73) },
+    });
+    const longQuestion = await app.inject({
+      method: "POST",
+      url: "/api/quizzes",
+      headers: { cookie },
+      payload: {
+        ...quizInput,
+        questions: [{ ...quizInput.questions[0], prompt: "Q".repeat(181) }],
+      },
+    });
+
+    expect(longTitle.statusCode).toBe(400);
+    expect(longQuestion.statusCode).toBe(400);
+    expect(
+      (await pool.query("SELECT count(*)::integer AS count FROM quizzes"))
+        .rows[0].count,
+    ).toBe(0);
+  });
+
   it("enforces ownership and deletes a quiz with all children", async () => {
     const ownerCookie = await register("owner@example.com");
     const created = await app.inject({
@@ -195,6 +221,30 @@ describe("quiz authoring", () => {
         })
       ).statusCode,
     ).toBe(404);
+    const owner = await pool.query<{ creator_id: string; question_id: string }>(
+      `SELECT q.creator_id, qu.id AS question_id
+         FROM quizzes q
+         JOIN questions qu ON qu.quiz_id = q.id
+        WHERE q.id = $1
+        ORDER BY qu.position
+        LIMIT 1`,
+      [quizId],
+    );
+    await pool.query(
+      `INSERT INTO live_sessions
+         (id, quiz_id, host_creator_id, join_code, state, finished_at)
+       VALUES ('00000000-0000-4000-8000-000000000901', $1, $2, 'OLD001', 'FINISHED', now())`,
+      [quizId, owner.rows[0]!.creator_id],
+    );
+    await pool.query(
+      `INSERT INTO question_rounds
+         (id, live_session_id, question_id, position, opened_at, answers_available_at, closes_at, closed_at)
+       VALUES ('00000000-0000-4000-8000-000000000902',
+               '00000000-0000-4000-8000-000000000901', $1, 0,
+               now() - interval '1 minute', now() - interval '50 seconds',
+               now() - interval '30 seconds', now() - interval '30 seconds')`,
+      [owner.rows[0]!.question_id],
+    );
     expect(
       (
         await app.inject({
@@ -217,6 +267,14 @@ describe("quiz authoring", () => {
       (
         await pool.query(
           "SELECT count(*)::integer AS count FROM answer_options",
+        )
+      ).rows[0].count,
+    ).toBe(0);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::integer AS count FROM live_sessions WHERE quiz_id = $1",
+          [quizId],
         )
       ).rows[0].count,
     ).toBe(0);

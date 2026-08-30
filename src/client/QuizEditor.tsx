@@ -60,7 +60,7 @@ export function QuizEditor({
           Quiz title
           <input
             value={quiz.title}
-            maxLength={120}
+            maxLength={72}
             required
             onChange={(event) =>
               onChange({ ...quiz, title: event.target.value })
@@ -125,7 +125,7 @@ export function QuizEditor({
             Question text
             <textarea
               value={question.prompt}
-              maxLength={500}
+              maxLength={180}
               required
               onChange={(event) =>
                 updateQuestion(questionIndex, { prompt: event.target.value })

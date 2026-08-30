@@ -358,21 +358,29 @@ export function HostLobby({ sessionId, onClose }: Props) {
     );
   if (question)
     return (
-      <main className="question-screen">
+      <main
+        className={`question-screen ${answerRevealRemaining > 0 ? "question-preview" : "answers-visible"} answer-count-${question.answers.length}`}
+      >
         <header className="question-header">
           <p>
             Question {question.position + 1} of {question.totalQuestions}
           </p>
-          <strong className="timer">
-            {answerRevealRemaining || secondsRemaining}
-          </strong>
+          <span aria-hidden="true" />
           <p>{question.points} points</p>
         </header>
-        <h1>{question.prompt}</h1>
+        <h1 className={question.prompt.length > 100 ? "long-question" : ""}>
+          {question.prompt}
+        </h1>
         {answerRevealRemaining > 0 ? (
-          <section className="question-preview-progress" aria-live="polite">
-            <strong>Answers appear in {answerRevealRemaining}s</strong>
-            <div className="question-preview-track" aria-hidden="true">
+          <section className="question-preview-progress">
+            <div
+              className="question-preview-track"
+              role="progressbar"
+              aria-label="Question preview"
+              aria-valuemin={0}
+              aria-valuemax={10}
+              aria-valuenow={10 - answerRevealRemaining}
+            >
               <span
                 style={{
                   width: `${Math.min(100, (10 - answerRevealRemaining) * 10)}%`,
@@ -382,30 +390,53 @@ export function HostLobby({ sessionId, onClose }: Props) {
           </section>
         ) : (
           <>
-            <section className="answer-progress" aria-live="polite">
-              <div className="answer-progress-copy">
-                <strong>{progress.answeredCount} answered</strong>
-                <span>{progress.totalPlayers} players</span>
-              </div>
+            <section className="presenter-status" aria-live="polite">
               <div
-                className="answer-progress-track"
-                role="progressbar"
-                aria-label="Players who have answered"
-                aria-valuemin={0}
-                aria-valuemax={progress.totalPlayers}
-                aria-valuenow={progress.answeredCount}
+                className={`round-timer-progress${secondsRemaining <= 5 ? " urgent" : ""}`}
               >
-                <span
-                  style={{
-                    width: `${progress.totalPlayers ? (progress.answeredCount / progress.totalPlayers) * 100 : 0}%`,
-                  }}
-                />
+                <div className="round-timer-copy">
+                  <span>Time remaining</span>
+                </div>
+                <div
+                  className="round-timer-track"
+                  role="progressbar"
+                  aria-label="Answer time remaining"
+                  aria-valuemin={0}
+                  aria-valuemax={question.timeLimitSeconds}
+                  aria-valuenow={secondsRemaining}
+                >
+                  <span
+                    style={{
+                      width: `${Math.min(100, (secondsRemaining / question.timeLimitSeconds) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="answer-progress">
+                <div className="answer-progress-copy">
+                  <strong>{progress.answeredCount} answered</strong>
+                  <span>{progress.totalPlayers} players</span>
+                </div>
+                <div
+                  className="answer-progress-track"
+                  role="progressbar"
+                  aria-label="Players who have answered"
+                  aria-valuemin={0}
+                  aria-valuemax={progress.totalPlayers}
+                  aria-valuenow={progress.answeredCount}
+                >
+                  <span
+                    style={{
+                      width: `${progress.totalPlayers ? (progress.answeredCount / progress.totalPlayers) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
               </div>
             </section>
             <div className="answer-grid">
               {question.answers.map((answer, index) => (
                 <div
-                  className={`answer-option answer-${index % 4}`}
+                  className={`answer-option answer-${index % 4}${answer.text.length > 70 ? " long-answer" : ""}`}
                   key={answer.id}
                 >
                   {answer.text}
@@ -414,16 +445,18 @@ export function HostLobby({ sessionId, onClose }: Props) {
             </div>
           </>
         )}
-        <button
-          className="reveal-button"
-          disabled={transitioning || answerRevealRemaining > 0}
-          onClick={() => void reveal()}
-        >
-          {transitioning ? "Revealing…" : "Show results"}
-        </button>
-        <button className="danger cancel-live" onClick={() => void cancel()}>
-          Cancel quiz
-        </button>
+        <div className="presenter-controls">
+          <button
+            className="reveal-button"
+            disabled={transitioning || answerRevealRemaining > 0}
+            onClick={() => void reveal()}
+          >
+            {transitioning ? "Revealing…" : "Show results"}
+          </button>
+          <button className="danger cancel-live" onClick={() => void cancel()}>
+            Cancel quiz
+          </button>
+        </div>
       </main>
     );
   return (

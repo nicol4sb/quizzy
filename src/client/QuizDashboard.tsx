@@ -63,9 +63,13 @@ export function QuizDashboard({ email, onLogout }: Props) {
   }
   async function deleteQuiz(id: string) {
     if (!window.confirm("Delete this quiz permanently?")) return;
+    setError("");
     const response = await fetch(`/api/quizzes/${id}`, { method: "DELETE" });
     if (response.ok) await loadQuizzes();
-    else setError("Could not delete that quiz.");
+    else {
+      const body = (await response.json()) as { error?: string };
+      setError(body.error ?? "Could not delete that quiz.");
+    }
   }
   async function launchQuiz(id: string) {
     setError("");

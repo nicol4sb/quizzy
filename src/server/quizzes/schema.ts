@@ -16,7 +16,7 @@ const answerSchema = z
 
 const questionSchema = z
   .object({
-    prompt: z.string().trim().min(1).max(500),
+    prompt: z.string().trim().min(1).max(180),
     points: z.number().int().min(1).max(100_000),
     timeLimitSeconds: z.number().int().min(5).max(300),
     answers: z.array(answerSchema).min(2).max(6),
@@ -34,7 +34,7 @@ const questionSchema = z
 
 export const quizInputSchema = z
   .object({
-    title: z.string().trim().min(1).max(120),
+    title: z.string().trim().min(1).max(72),
     theme: z.enum(themes),
     questions: z.array(questionSchema).min(1).max(100),
   })

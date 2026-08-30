@@ -266,6 +266,10 @@ export async function registerQuizRoutes(
           error: "Cancel or finish the active lobby before deleting this quiz.",
         });
       }
+      await client.query(
+        "DELETE FROM live_sessions WHERE quiz_id = $1 AND state = 'FINISHED'",
+        [parsedId.data],
+      );
       await client.query("DELETE FROM quizzes WHERE id = $1", [parsedId.data]);
       await client.query("COMMIT");
       return reply.code(204).send();

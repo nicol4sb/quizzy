@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
   theme text NOT NULL DEFAULT 'game-show',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT quizzes_title_length CHECK (char_length(title) BETWEEN 1 AND 120),
+  CONSTRAINT quizzes_title_length CHECK (char_length(title) BETWEEN 1 AND 72),
   CONSTRAINT quizzes_theme_valid CHECK (theme IN ('game-show', 'classroom', 'neon-arcade', 'minimal'))
 );
 
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS questions (
   points integer NOT NULL,
   time_limit_seconds integer NOT NULL,
   CONSTRAINT questions_position_valid CHECK (position >= 0),
-  CONSTRAINT questions_prompt_length CHECK (char_length(prompt) BETWEEN 1 AND 500),
+  CONSTRAINT questions_prompt_length CHECK (char_length(prompt) BETWEEN 1 AND 180),
   CONSTRAINT questions_points_valid CHECK (points BETWEEN 1 AND 100000),
   CONSTRAINT questions_time_limit_valid CHECK (time_limit_seconds BETWEEN 5 AND 300),
   UNIQUE (quiz_id, position)

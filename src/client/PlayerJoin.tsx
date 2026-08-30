@@ -7,7 +7,7 @@ import {
   type LiveResults,
   useCountdown,
 } from "./live";
-import { Podium, ResultsView } from "./ResultsView";
+import { Podium } from "./ResultsView";
 
 type Lobby = { joinCode: string; quizTitle: string };
 type JoinedPlayer = {
@@ -15,6 +15,11 @@ type JoinedPlayer = {
   quizTitle: string;
   player: { id: string; nickname: string };
   token: string;
+};
+type PlayerResult = {
+  answerId?: string;
+  isCorrect: boolean;
+  pointsAwarded: number;
 };
 
 function websocketUrl(joined: JoinedPlayer): string {
@@ -63,6 +68,7 @@ export function PlayerJoin({ code }: { code: string }) {
   const [answering, setAnswering] = useState(false);
   const [answered, setAnswered] = useState(false);
   const [results, setResults] = useState<LiveResults>();
+  const [playerResult, setPlayerResult] = useState<PlayerResult>();
   const [finalLeaderboard, setFinalLeaderboard] =
     useState<LeaderboardEntry[]>();
   const [cancelled, setCancelled] = useState(false);
@@ -126,6 +132,7 @@ export function PlayerJoin({ code }: { code: string }) {
         session: { state: string };
         currentQuestion?: LiveQuestion;
         submittedAnswerId?: string;
+        playerResult?: PlayerResult;
         results?: LiveResults;
         leaderboard?: LeaderboardEntry[];
       };
@@ -133,6 +140,7 @@ export function PlayerJoin({ code }: { code: string }) {
       setSelectedAnswerId(snapshot.submittedAnswerId);
       setAnswered(Boolean(snapshot.submittedAnswerId));
       setResults(snapshot.results);
+      setPlayerResult(snapshot.playerResult);
       setFinalLeaderboard(snapshot.leaderboard);
       return snapshot.session.state;
     }
@@ -157,11 +165,14 @@ export function PlayerJoin({ code }: { code: string }) {
             setSelectedAnswerId(undefined);
             setAnswered(false);
             setResults(undefined);
+            setPlayerResult(undefined);
           }
           return event.payload!.question;
         });
-      if (event.type === "results_revealed" && event.payload?.results)
+      if (event.type === "results_revealed" && event.payload?.results) {
         setResults(event.payload.results);
+        void syncSnapshot();
+      }
       if (event.type === "quiz_finished" && event.payload?.leaderboard) {
         setFinalLeaderboard(event.payload.leaderboard);
         stopped = true;
@@ -296,10 +307,42 @@ export function PlayerJoin({ code }: { code: string }) {
 
   if (joined && finalLeaderboard) return <Podium entries={finalLeaderboard} />;
 
-  if (joined && results)
-    return (
-      <ResultsView results={results} selectedAnswerId={selectedAnswerId} />
+  if (joined && results) {
+    const correctAnswer = results.question.answers.find(
+      (answer) => answer.id === results.correctAnswerId,
     );
+    return (
+      <main
+        className={`player-result ${playerResult?.isCorrect ? "player-result-correct" : "player-result-incorrect"}`}
+      >
+        {playerResult ? (
+          <section className="player-result-card" aria-live="polite">
+            <div className="result-symbol" aria-hidden="true">
+              {playerResult.isCorrect ? "✓" : "×"}
+            </div>
+            <p className="eyebrow">
+              {playerResult.isCorrect
+                ? "Correct!"
+                : playerResult.answerId
+                  ? "Not this time"
+                  : "Time’s up"}
+            </p>
+            <strong className="points-earned">
+              +{playerResult.pointsAwarded} points
+            </strong>
+            <div className="correct-answer-card">
+              <small>Correct answer</small>
+              <strong>{correctAnswer?.text ?? "Answer revealed"}</strong>
+            </div>
+          </section>
+        ) : (
+          <section className="player-result-card">
+            <p>Calculating your score…</p>
+          </section>
+        )}
+      </main>
+    );
+  }
 
   if (joined && question)
     return (
@@ -319,7 +362,6 @@ export function PlayerJoin({ code }: { code: string }) {
           <p>{question.points} pts</p>
         </header>
         <div className="remote-prompt">
-          <p className="eyebrow">Use the main screen</p>
           <h1>
             {answerRevealRemaining > 0 ? "Get ready…" : "Choose an answer"}
           </h1>

@@ -574,6 +574,11 @@ describe("live session launch", () => {
           roundId: started.json().question.roundId,
         }),
         submittedAnswerId: answerId,
+        playerResult: {
+          answerId,
+          isCorrect: true,
+          pointsAwarded: 1000,
+        },
       }),
     );
     const storedAnswer = await pool.query<{
@@ -770,6 +775,16 @@ describe("live session launch", () => {
         ],
       }),
     );
+    const graceResult = await app.inject({
+      method: "GET",
+      url: `/api/sessions/${sessionId}/player`,
+      headers: { authorization: `Bearer ${grace.json().token}` },
+    });
+    expect(graceResult.json().playerResult).toEqual({
+      answerId: firstQuestion.answers[1].id,
+      isCorrect: false,
+      pointsAwarded: 0,
+    });
     expect(
       (
         await app.inject({
