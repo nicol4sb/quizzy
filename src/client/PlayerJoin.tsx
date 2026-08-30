@@ -26,9 +26,36 @@ function websocketUrl(joined: JoinedPlayer): string {
   return url.toString();
 }
 
+const storedPlayerKey = (code: string) =>
+  `quizzy:player:${code.trim().toUpperCase()}`;
+
+function restorePlayer(code: string): JoinedPlayer | undefined {
+  try {
+    const stored = window.sessionStorage.getItem(storedPlayerKey(code));
+    if (!stored) return undefined;
+    const player = JSON.parse(stored) as Partial<JoinedPlayer>;
+    if (
+      typeof player.sessionId !== "string" ||
+      typeof player.quizTitle !== "string" ||
+      typeof player.token !== "string" ||
+      typeof player.player?.id !== "string" ||
+      typeof player.player.nickname !== "string"
+    ) {
+      window.sessionStorage.removeItem(storedPlayerKey(code));
+      return undefined;
+    }
+    return player as JoinedPlayer;
+  } catch {
+    window.sessionStorage.removeItem(storedPlayerKey(code));
+    return undefined;
+  }
+}
+
 export function PlayerJoin({ code }: { code: string }) {
   const [lobby, setLobby] = useState<Lobby>();
-  const [joined, setJoined] = useState<JoinedPlayer>();
+  const [joined, setJoined] = useState<JoinedPlayer | undefined>(() =>
+    restorePlayer(code),
+  );
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [question, setQuestion] = useState<LiveQuestion>();
@@ -39,10 +66,15 @@ export function PlayerJoin({ code }: { code: string }) {
   const [finalLeaderboard, setFinalLeaderboard] =
     useState<LeaderboardEntry[]>();
   const [cancelled, setCancelled] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [error, setError] = useState("");
   const secondsRemaining = useCountdown(question?.closesAt);
 
   useEffect(() => {
+    if (joined) {
+      setLoading(false);
+      return;
+    }
     void fetch(`/api/lobbies/${encodeURIComponent(code)}`)
       .then(async (response) => {
         if (!response.ok)
@@ -58,12 +90,53 @@ export function PlayerJoin({ code }: { code: string }) {
         ),
       )
       .finally(() => setLoading(false));
-  }, [code]);
+  }, [code, joined]);
 
   useEffect(() => {
     if (!joined) return;
-    const socket = new WebSocket(websocketUrl(joined));
-    socket.addEventListener("message", (message) => {
+    const activePlayer = joined;
+    let socket: WebSocket | undefined;
+    let retryTimer: number | undefined;
+    let retryAttempt = 0;
+    let stopped = false;
+
+    async function syncSnapshot(): Promise<string | undefined> {
+      let response: Response;
+      try {
+        response = await fetch(
+          `/api/sessions/${activePlayer.sessionId}/player`,
+          {
+            headers: { authorization: `Bearer ${activePlayer.token}` },
+          },
+        );
+      } catch {
+        setReconnecting(true);
+        return undefined;
+      }
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 404) {
+          window.sessionStorage.removeItem(storedPlayerKey(code));
+          setCancelled(true);
+          return "ENDED";
+        }
+        return undefined;
+      }
+      const snapshot = (await response.json()) as {
+        session: { state: string };
+        currentQuestion?: LiveQuestion;
+        submittedAnswerId?: string;
+        results?: LiveResults;
+        leaderboard?: LeaderboardEntry[];
+      };
+      setQuestion(snapshot.currentQuestion);
+      setSelectedAnswerId(snapshot.submittedAnswerId);
+      setAnswered(Boolean(snapshot.submittedAnswerId));
+      setResults(snapshot.results);
+      setFinalLeaderboard(snapshot.leaderboard);
+      return snapshot.session.state;
+    }
+
+    function handleMessage(message: MessageEvent) {
       const event = JSON.parse(message.data as string) as {
         type: string;
         payload?: {
@@ -73,19 +146,9 @@ export function PlayerJoin({ code }: { code: string }) {
         };
       };
       if (event.type === "connected") {
-        void fetch(`/api/sessions/${joined.sessionId}/player`, {
-          headers: { authorization: `Bearer ${joined.token}` },
-        }).then(async (response) => {
-          if (!response.ok) return;
-          const snapshot = (await response.json()) as {
-            currentQuestion?: LiveQuestion;
-            results?: LiveResults;
-            leaderboard?: LeaderboardEntry[];
-          };
-          setQuestion(snapshot.currentQuestion);
-          setResults(snapshot.results);
-          setFinalLeaderboard(snapshot.leaderboard);
-        });
+        retryAttempt = 0;
+        setReconnecting(false);
+        void syncSnapshot();
       }
       if (event.type === "question_opened" && event.payload?.question)
         setQuestion((current) => {
@@ -98,12 +161,58 @@ export function PlayerJoin({ code }: { code: string }) {
         });
       if (event.type === "results_revealed" && event.payload?.results)
         setResults(event.payload.results);
-      if (event.type === "quiz_finished" && event.payload?.leaderboard)
+      if (event.type === "quiz_finished" && event.payload?.leaderboard) {
         setFinalLeaderboard(event.payload.leaderboard);
-      if (event.type === "session_ended") setCancelled(true);
+        stopped = true;
+        socket?.close();
+      }
+      if (event.type === "session_ended") {
+        window.sessionStorage.removeItem(storedPlayerKey(code));
+        setCancelled(true);
+        stopped = true;
+        socket?.close();
+      }
+    }
+
+    function connect() {
+      if (
+        stopped ||
+        socket?.readyState === WebSocket.OPEN ||
+        socket?.readyState === WebSocket.CONNECTING
+      )
+        return;
+      socket = new WebSocket(websocketUrl(activePlayer));
+      socket.addEventListener("message", handleMessage);
+      socket.addEventListener("close", () => {
+        if (stopped) return;
+        setReconnecting(true);
+        const delay = Math.min(1000 * 2 ** retryAttempt, 10_000);
+        retryAttempt += 1;
+        retryTimer = window.setTimeout(connect, delay);
+      });
+    }
+
+    function resume() {
+      if (document.visibilityState === "hidden" || stopped) return;
+      window.clearTimeout(retryTimer);
+      void syncSnapshot().then((state) => {
+        if (state !== "FINISHED" && state !== "ENDED") connect();
+      });
+    }
+
+    void syncSnapshot().then((state) => {
+      if (state !== "FINISHED" && state !== "ENDED") connect();
     });
-    return () => socket.close();
-  }, [joined]);
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
+    return () => {
+      stopped = true;
+      window.clearTimeout(retryTimer);
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", resume);
+      socket?.close();
+    };
+  }, [code, joined]);
 
   async function join(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,8 +228,13 @@ export function PlayerJoin({ code }: { code: string }) {
       },
     );
     const body = (await response.json()) as JoinedPlayer & { error?: string };
-    if (response.ok) setJoined(body);
-    else setError(body.error ?? "Could not join this lobby.");
+    if (response.ok) {
+      window.sessionStorage.setItem(
+        storedPlayerKey(code),
+        JSON.stringify(body),
+      );
+      setJoined(body);
+    } else setError(body.error ?? "Could not join this lobby.");
     setSubmitting(false);
   }
 
@@ -182,6 +296,11 @@ export function PlayerJoin({ code }: { code: string }) {
   if (joined && question)
     return (
       <main className="player-question">
+        {reconnecting && (
+          <p className="connection-notice" role="status">
+            Reconnecting…
+          </p>
+        )}
         <header className="question-header">
           <p>
             Question {question.position + 1} of {question.totalQuestions}
@@ -189,16 +308,20 @@ export function PlayerJoin({ code }: { code: string }) {
           <strong className="timer">{secondsRemaining}</strong>
           <p>{question.points} pts</p>
         </header>
-        <h1>{question.prompt}</h1>
+        <div className="remote-prompt">
+          <p className="eyebrow">Use the main screen</p>
+          <h1>Choose an answer</h1>
+        </div>
         <div className="answer-grid player-answers">
           {question.answers.map((answer, index) => (
             <button
               className={`answer-option answer-${index % 4}${selectedAnswerId === answer.id ? " selected" : ""}`}
               key={answer.id}
+              aria-label={`Answer ${String.fromCharCode(65 + index)}`}
               disabled={answered || answering || secondsRemaining === 0}
               onClick={() => void submitAnswer(answer.id)}
             >
-              {answer.text}
+              <span aria-hidden="true">{String.fromCharCode(65 + index)}</span>
             </button>
           ))}
         </div>
@@ -210,6 +333,11 @@ export function PlayerJoin({ code }: { code: string }) {
   if (joined)
     return (
       <main className="shell">
+        {reconnecting && (
+          <p className="connection-notice" role="status">
+            Reconnecting…
+          </p>
+        )}
         <section className="card waiting-card">
           <p className="eyebrow">You’re in</p>
           <h1>{joined.player.nickname}</h1>

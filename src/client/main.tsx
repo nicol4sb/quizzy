@@ -9,7 +9,7 @@ type Creator = { id: string; email: string; createdAt: string };
 
 function App() {
   const [creator, setCreator] = useState<Creator>();
-  const [mode, setMode] = useState<"register" | "login">("register");
+  const [mode, setMode] = useState<"register" | "login">("login");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);

@@ -24,6 +24,7 @@ The expected room size is approximately 50 players. This is an operating assumpt
 - Quiz launch and host-controlled lobby
 - Session-specific join URL and QR code
 - Anonymous nickname-only player entry
+- Same-device player recovery after transient disconnection or page restoration
 - Real-time connected-player list in the lobby
 - Host-controlled start, question progression, result reveal, and finish
 - Real-time answered count
@@ -35,7 +36,6 @@ The expected room size is approximately 50 players. This is an operating assumpt
 
 - AI quiz generation or conversational editing
 - Player accounts or login
-- Player reconnection or state restoration
 - Late joining after the host starts the quiz
 - Quiz versioning
 - Multiple correct answers and free-text answers
@@ -62,9 +62,9 @@ Joining is allowed only while the session is in `LOBBY`. Starting the first ques
 
 ### Disconnection
 
-Reconnection is outside the MVP. Closing, refreshing, or losing the page ends the live connection. Previously accepted answers and scores remain stored, but the player cannot return after the quiz begins.
+The player browser stores its anonymous credential in per-tab session storage. When a phone wakes, regains connectivity, or restores the tab, it reconnects its WebSocket and reads an authoritative HTTP snapshot. The snapshot restores the current question, the player's submitted answer for that round, revealed results, or the final leaderboard.
 
-The player UI must warn: “Keep this page open during the quiz. Refreshing or closing it will disconnect you.”
+Recovery is limited to the same browser session and existing player credential. It does not permit late joining, moving a player to another device, choosing a new nickname, or recovering a deliberately cleared browser session.
 
 ### Scoring
 
@@ -214,7 +214,7 @@ Implementations:
 - MVP: in-memory delivery within the single deployment
 - Later: Redis Pub/Sub across WebSocket instances
 
-Room events are notifications, not durable truth. A future client recovering from a missed event would obtain an authoritative snapshot from the HTTP API, although automatic reconnection is not part of the MVP.
+Room events are notifications, not durable truth. A client recovering from a missed event obtains an authoritative snapshot from the HTTP API.
 
 ## 8. Communication model
 
@@ -432,9 +432,10 @@ Build a single-question vertical slice first:
 9. Accept and persist answers idempotently. **Complete.**
 10. Show an aggregated answered count. **Complete.**
 11. Reveal results, score the player, and show a podium. **Complete.**
-12. Verify server-authoritative deadlines. **Complete.** Disconnection/reconnection behavior remains outside the MVP.
+12. Verify server-authoritative deadlines. **Complete.**
+13. Restore same-device player sessions after transient mobile disconnections. **Complete.**
 
-Then add reconnection if justified, stronger theme differentiation, operational observability, rate limiting, and load tests.
+Then add cross-device recovery if justified, operational observability, rate limiting, and load tests.
 
 ## 15. Architectural invariants
 

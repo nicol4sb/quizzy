@@ -47,6 +47,7 @@ function publicSession(row) {
         id: row.id,
         quizId: row.quiz_id,
         quizTitle: row.quiz_title,
+        quizTheme: row.quiz_theme,
         joinCode: row.join_code.trim(),
         joinPath: `/join/${row.join_code.trim()}`,
         state: row.state,
@@ -54,7 +55,7 @@ function publicSession(row) {
         createdAt: row.created_at,
     };
 }
-const sessionSelect = `SELECT s.id, s.quiz_id, q.title AS quiz_title, s.join_code, s.state, s.revision, s.created_at
+const sessionSelect = `SELECT s.id, s.quiz_id, q.title AS quiz_title, q.theme AS quiz_theme, s.join_code, s.state, s.revision, s.created_at
   FROM live_sessions s JOIN quizzes q ON q.id = s.quiz_id`;
 export async function registerSessionRoutes(app, database) {
     app.post("/api/quizzes/:id/sessions", async (request, reply) => {
@@ -92,6 +93,7 @@ export async function registerSessionRoutes(app, database) {
            VALUES ($1, $2, $3, $4)
            ON CONFLICT (join_code) DO NOTHING
            RETURNING id, quiz_id, (SELECT title FROM quizzes WHERE id = $2) AS quiz_title,
+                     (SELECT theme FROM quizzes WHERE id = $2) AS quiz_theme,
                      join_code, state, revision, created_at`, [sessionId, parsedId.data, hostCreatorId, code]);
                 created = result.rows[0];
             }
@@ -148,12 +150,19 @@ export async function registerSessionRoutes(app, database) {
         const session = result.rows[0];
         if (!session)
             return reply.code(404).send({ error: "Session not found." });
+        const question = ["QUESTION_OPEN", "RESULTS", "FINISHED"].includes(session.state)
+            ? await currentQuestion(database, session.id)
+            : undefined;
+        const submittedAnswer = question
+            ? await database.query(`SELECT answer_option_id
+             FROM answer_submissions
+            WHERE question_round_id = $1 AND player_id = $2`, [question.roundId, player.id])
+            : undefined;
         return {
             session: publicSession(session),
             player: { id: player.id, nickname: player.nickname },
-            currentQuestion: ["QUESTION_OPEN", "RESULTS", "FINISHED"].includes(session.state)
-                ? await currentQuestion(database, session.id)
-                : undefined,
+            currentQuestion: question,
+            submittedAnswerId: submittedAnswer?.rows[0]?.answer_option_id,
             results: session.state === "RESULTS"
                 ? await questionResults(database, session.id)
                 : undefined,

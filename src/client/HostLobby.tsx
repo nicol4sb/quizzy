@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type AnswerProgress,
   type LeaderboardEntry,
@@ -12,6 +12,7 @@ import { Podium, ResultsView } from "./ResultsView";
 type Session = {
   id: string;
   quizTitle: string;
+  quizTheme: "game-show" | "classroom" | "neon-arcade" | "minimal";
   joinCode: string;
   joinPath: string;
   state: string;
@@ -20,11 +21,25 @@ type Session = {
 type Player = { id: string; nickname: string; joinedAt: string };
 type Props = { sessionId: string; onClose: () => void };
 
+const joinSymbols: Record<Session["quizTheme"], string> = {
+  "game-show": "★",
+  classroom: "✎",
+  "neon-arcade": "⚡",
+  minimal: "+",
+};
+
 export function HostLobby({ sessionId, onClose }: Props) {
   const [session, setSession] = useState<Session>();
   const [qrCode, setQrCode] = useState("");
   const [joinOrigin, setJoinOrigin] = useState(window.location.origin);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [joinedPlayer, setJoinedPlayer] = useState<{
+    player: Player;
+    sequence: number;
+  }>();
+  const knownPlayerIds = useRef(new Set<string>());
+  const joinSequence = useRef(0);
+  const celebrationTimer = useRef<number | undefined>(undefined);
   const [question, setQuestion] = useState<LiveQuestion>();
   const [progress, setProgress] = useState<AnswerProgress>({
     answeredCount: 0,
@@ -56,6 +71,9 @@ export function HostLobby({ sessionId, onClose }: Props) {
       const loaded = snapshot.session;
       setSession(loaded);
       setPlayers(snapshot.players);
+      knownPlayerIds.current = new Set(
+        snapshot.players.map((player) => player.id),
+      );
       setQuestion(snapshot.currentQuestion);
       setProgress(
         snapshot.answerProgress ?? {
@@ -104,6 +122,24 @@ export function HostLobby({ sessionId, onClose }: Props) {
       const payload = event.payload;
       if (event.type === "connected") void loadSnapshot();
       if (event.type === "lobby_updated" && payload?.players) {
+        const newPlayer = payload.players.find(
+          (player) => !knownPlayerIds.current.has(player.id),
+        );
+        knownPlayerIds.current = new Set(
+          payload.players.map((player) => player.id),
+        );
+        if (newPlayer) {
+          joinSequence.current += 1;
+          setJoinedPlayer({
+            player: newPlayer,
+            sequence: joinSequence.current,
+          });
+          window.clearTimeout(celebrationTimer.current);
+          celebrationTimer.current = window.setTimeout(
+            () => setJoinedPlayer(undefined),
+            2200,
+          );
+        }
         setPlayers(payload.players);
         setProgress((current) => ({
           ...current,
@@ -163,7 +199,10 @@ export function HostLobby({ sessionId, onClose }: Props) {
       }
       if (event.type === "session_ended") onClose();
     });
-    return () => socket.close();
+    return () => {
+      socket.close();
+      window.clearTimeout(celebrationTimer.current);
+    };
   }, [sessionId]);
 
   async function cancel() {
@@ -327,9 +366,26 @@ export function HostLobby({ sessionId, onClose }: Props) {
           <p>{question.points} points</p>
         </header>
         <h1>{question.prompt}</h1>
-        <p className="answer-progress">
-          {progress.answeredCount} / {progress.totalPlayers} answered
-        </p>
+        <section className="answer-progress" aria-live="polite">
+          <div className="answer-progress-copy">
+            <strong>{progress.answeredCount} answered</strong>
+            <span>{progress.totalPlayers} players</span>
+          </div>
+          <div
+            className="answer-progress-track"
+            role="progressbar"
+            aria-label="Players who have answered"
+            aria-valuemin={0}
+            aria-valuemax={progress.totalPlayers}
+            aria-valuenow={progress.answeredCount}
+          >
+            <span
+              style={{
+                width: `${progress.totalPlayers ? (progress.answeredCount / progress.totalPlayers) * 100 : 0}%`,
+              }}
+            />
+          </div>
+        </section>
         <div className="answer-grid">
           {question.answers.map((answer, index) => (
             <div
@@ -353,7 +409,18 @@ export function HostLobby({ sessionId, onClose }: Props) {
       </main>
     );
   return (
-    <main className="lobby-shell">
+    <main className={`lobby-shell theme-${session.quizTheme}`}>
+      {joinedPlayer && (
+        <div
+          className="join-celebration"
+          key={joinedPlayer.sequence}
+          role="status"
+        >
+          <span aria-hidden="true">{joinSymbols[session.quizTheme]}</span>
+          <strong>{joinedPlayer.player.nickname}</strong>
+          <small>joined the quiz!</small>
+        </div>
+      )}
       <section className="lobby-main">
         <p className="eyebrow">Waiting for players</p>
         <h1>{session.quizTitle}</h1>

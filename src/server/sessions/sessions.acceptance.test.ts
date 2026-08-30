@@ -79,6 +79,7 @@ describe("live session launch", () => {
       expect.objectContaining({
         quizId,
         quizTitle: quizInput.title,
+        quizTheme: quizInput.theme,
         state: "LOBBY",
         revision: 1,
       }),
@@ -538,6 +539,19 @@ describe("live session launch", () => {
       expect.objectContaining({
         session: expect.objectContaining({ state: "RESULTS", revision: 4 }),
         results: expect.objectContaining({ answeredCount: 1, totalPlayers: 1 }),
+      }),
+    );
+    const recoveredPlayer = await app.inject({
+      method: "GET",
+      url: `/api/sessions/${sessionId}/player`,
+      headers: { authorization: `Bearer ${joined.json().token}` },
+    });
+    expect(recoveredPlayer.json()).toEqual(
+      expect.objectContaining({
+        currentQuestion: expect.objectContaining({
+          roundId: started.json().question.roundId,
+        }),
+        submittedAnswerId: answerId,
       }),
     );
     const storedAnswer = await pool.query<{

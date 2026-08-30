@@ -16,5 +16,5 @@ The disposable alpha uses one canonical `database/schema.sql` rather than an aut
 
 - PostgreSQL is installed and operated separately on the VPS.
 - Production frontend builds happen before deployment, not on the VPS.
-- A process failure interrupts active WebSockets; reconnection is outside the MVP.
+- A process failure interrupts active WebSockets; player browsers reconnect with their existing anonymous credential and recover from an authoritative HTTP snapshot when the process returns.
 - Multiple application instances require a shared event bus first.
