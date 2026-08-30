@@ -8,6 +8,7 @@ import {
   useCountdown,
 } from "./live";
 import { Podium, ResultsView } from "./ResultsView";
+import { RichText } from "./RichText";
 
 type Session = {
   id: string;
@@ -368,9 +369,13 @@ export function HostLobby({ sessionId, onClose }: Props) {
           <span aria-hidden="true" />
           <p>{question.points} points</p>
         </header>
-        <h1 className={question.prompt.length > 100 ? "long-question" : ""}>
-          {question.prompt}
-        </h1>
+        <div
+          aria-level={1}
+          className={`question-prompt${question.prompt.length > 100 ? " long-question" : ""}`}
+          role="heading"
+        >
+          <RichText text={question.prompt} />
+        </div>
         {answerRevealRemaining > 0 ? (
           <section className="question-preview-progress">
             <div
@@ -439,7 +444,7 @@ export function HostLobby({ sessionId, onClose }: Props) {
                   className={`answer-option answer-${index % 4}${answer.text.length > 70 ? " long-answer" : ""}`}
                   key={answer.id}
                 >
-                  {answer.text}
+                  <RichText text={answer.text} />
                 </div>
               ))}
             </div>

@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { newQuestion, type QuizDraft } from "./quizzes";
+import { hasRichFormatting, RichText } from "./RichText";
 
 type Props = {
   quiz: QuizDraft;
@@ -88,6 +89,42 @@ export function QuizEditor({
       {quiz.questions.map((question, questionIndex) => (
         <fieldset className="question-card" key={question.clientId}>
           <legend>Question {questionIndex + 1}</legend>
+          <details className="formatting-help">
+            <summary aria-label="Show code and math formatting examples">
+              <span className="formatting-info-icon" aria-hidden="true">
+                i
+              </span>
+              <span className="sr-only">Code and math formatting examples</span>
+            </summary>
+            <div>
+              <p>
+                Questions and answers support code and LaTeX. Quiz titles stay
+                plain text.
+              </p>
+              <dl>
+                <dt>Inline code</dt>
+                <dd>
+                  <code>`SELECT * FROM players`</code>
+                </dd>
+                <dt>Code block</dt>
+                <dd>
+                  <pre>{"```sql\nSELECT score FROM players;\n```"}</pre>
+                </dd>
+                <dt>Answer snippet</dt>
+                <dd>
+                  <code>{"```javascript const total = 2 + 2;```"}</code>
+                </dd>
+                <dt>Inline math</dt>
+                <dd>
+                  <code>{"\\(E = mc^2\\)"}</code>
+                </dd>
+                <dt>Display math</dt>
+                <dd>
+                  <code>{"$$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$"}</code>
+                </dd>
+              </dl>
+            </div>
+          </details>
           <div className="question-actions">
             <button
               type="button"
@@ -132,6 +169,12 @@ export function QuizEditor({
               }
             />
           </label>
+          {hasRichFormatting(question.prompt) && (
+            <div className="rich-preview">
+              <small>Question preview</small>
+              <RichText text={question.prompt} />
+            </div>
+          )}
           <div className="question-settings">
             <label>
               Points
@@ -210,6 +253,12 @@ export function QuizEditor({
                 >
                   Remove
                 </button>
+                {hasRichFormatting(answer.text) && (
+                  <div className="rich-preview answer-rich-preview">
+                    <small>Preview</small>
+                    <RichText text={answer.text} />
+                  </div>
+                )}
               </div>
             ))}
             <button

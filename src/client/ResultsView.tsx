@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LeaderboardEntry, LiveResults } from "./live";
+import { RichText } from "./RichText";
 
 export function ResultsView({
   results,
@@ -20,7 +21,9 @@ export function ResultsView({
           Results · Question {results.question.position + 1} of{" "}
           {results.question.totalQuestions}
         </p>
-        <h1>{results.question.prompt}</h1>
+        <div className="result-question" role="heading" aria-level={1}>
+          <RichText text={results.question.prompt} />
+        </div>
         <div className="answer-grid">
           {results.question.answers.map((answer, index) => (
             <div
@@ -32,7 +35,7 @@ export function ResultsView({
               {answer.id === results.correctAnswerId && (
                 <small className="correct-badge">✓ Correct answer</small>
               )}
-              <span>{answer.text}</span>
+              <RichText text={answer.text} />
               <strong>{votes.get(answer.id) ?? 0}</strong>
             </div>
           ))}

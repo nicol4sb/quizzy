@@ -8,6 +8,7 @@ import {
   useCountdown,
 } from "./live";
 import { Podium } from "./ResultsView";
+import { RichText } from "./RichText";
 
 type Lobby = { joinCode: string; quizTitle: string };
 type JoinedPlayer = {
@@ -332,7 +333,7 @@ export function PlayerJoin({ code }: { code: string }) {
             </strong>
             <div className="correct-answer-card">
               <small>Correct answer</small>
-              <strong>{correctAnswer?.text ?? "Answer revealed"}</strong>
+              <RichText text={correctAnswer?.text ?? "Answer revealed"} />
             </div>
           </section>
         ) : (
