@@ -16,7 +16,10 @@ export function ResultsView({
   return (
     <main className="results-screen">
       <section className="results-main">
-        <p className="eyebrow">Results</p>
+        <p className="eyebrow">
+          Results · Question {results.question.position + 1} of{" "}
+          {results.question.totalQuestions}
+        </p>
         <h1>{results.question.prompt}</h1>
         <div className="answer-grid">
           {results.question.answers.map((answer, index) => (

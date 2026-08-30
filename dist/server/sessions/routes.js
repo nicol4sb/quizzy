@@ -373,14 +373,41 @@ export async function registerSessionRoutes(app, database) {
                     ? speedScore(round.points, round.opened_at, round.closes_at, round.server_now)
                     : 0,
             ]);
+            const progressResult = await client.query(`SELECT
+           (SELECT count(*)::integer FROM answer_submissions WHERE question_round_id = $2) AS answered_count,
+           (SELECT count(*)::integer FROM players WHERE live_session_id = $1) AS total_players`, [parsedId.data, parsedBody.data.roundId]);
+            const counts = progressResult.rows[0];
+            let resultsRevision;
+            if (counts.total_players > 0 &&
+                counts.answered_count === counts.total_players) {
+                await client.query("UPDATE question_rounds SET closed_at = now() WHERE id = $1", [parsedBody.data.roundId]);
+                const updated = await client.query(`UPDATE live_sessions
+              SET state = 'RESULTS', revision = revision + 1
+            WHERE id = $1 AND state = 'QUESTION_OPEN'
+            RETURNING revision`, [parsedId.data]);
+                resultsRevision = updated.rows[0]?.revision;
+            }
             await client.query("COMMIT");
             transactionOpen = false;
-            const progress = await answerProgress(database, parsedId.data, parsedBody.data.roundId);
+            const progress = {
+                answeredCount: counts.answered_count,
+                totalPlayers: counts.total_players,
+            };
             await app.roomEventBus.publish(parsedId.data, {
                 type: "answer_count_updated",
                 revision: round.revision,
                 payload: { roundId: parsedBody.data.roundId, ...progress },
             });
+            if (resultsRevision !== undefined) {
+                const results = await questionResults(database, parsedId.data);
+                if (!results)
+                    throw new Error("Automatic results could not be read");
+                await app.roomEventBus.publish(parsedId.data, {
+                    type: "results_revealed",
+                    revision: resultsRevision,
+                    payload: { results },
+                });
+            }
             return { accepted: true };
         }
         catch (error) {

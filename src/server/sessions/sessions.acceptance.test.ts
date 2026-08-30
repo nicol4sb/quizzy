@@ -456,6 +456,13 @@ describe("live session launch", () => {
         resolve(event);
       });
     });
+    const resultsEvent = new Promise<unknown>((resolve) => {
+      const unsubscribe = eventBus.subscribe(sessionId, (event) => {
+        if (event.type !== "results_revealed") return;
+        unsubscribe();
+        resolve(event);
+      });
+    });
     const submissionId = "00000000-0000-4000-8000-000000000099";
     const answerId = started.json().question.answers[0].id;
     const answer = await app.inject({
@@ -480,6 +487,18 @@ describe("live session launch", () => {
         totalPlayers: 1,
       },
     });
+    expect(await resultsEvent).toEqual(
+      expect.objectContaining({
+        type: "results_revealed",
+        revision: 4,
+        payload: {
+          results: expect.objectContaining({
+            answeredCount: 1,
+            totalPlayers: 1,
+          }),
+        },
+      }),
+    );
 
     const replay = await app.inject({
       method: "POST",
@@ -515,6 +534,12 @@ describe("live session launch", () => {
       answeredCount: 1,
       totalPlayers: 1,
     });
+    expect(hostProgress.json()).toEqual(
+      expect.objectContaining({
+        session: expect.objectContaining({ state: "RESULTS", revision: 4 }),
+        results: expect.objectContaining({ answeredCount: 1, totalPlayers: 1 }),
+      }),
+    );
     const storedAnswer = await pool.query<{
       is_correct: boolean;
       points_awarded: number;
@@ -652,31 +677,35 @@ describe("live session launch", () => {
       expect.objectContaining({ position: 0, totalQuestions: 2 }),
     );
     const firstQuestion = first.json().question;
-    await app.inject({
-      method: "POST",
-      url: `/api/sessions/${sessionId}/answers`,
-      headers: { authorization: `Bearer ${ada.json().token}` },
-      payload: {
-        submissionId: "00000000-0000-4000-8000-000000000201",
-        roundId: firstQuestion.roundId,
-        answerId: firstQuestion.answers[0].id,
-      },
-    });
-    await app.inject({
-      method: "POST",
-      url: `/api/sessions/${sessionId}/answers`,
-      headers: { authorization: `Bearer ${grace.json().token}` },
-      payload: {
-        submissionId: "00000000-0000-4000-8000-000000000202",
-        roundId: firstQuestion.roundId,
-        answerId: firstQuestion.answers[1].id,
-      },
-    });
+    const submitted = await Promise.all([
+      app.inject({
+        method: "POST",
+        url: `/api/sessions/${sessionId}/answers`,
+        headers: { authorization: `Bearer ${ada.json().token}` },
+        payload: {
+          submissionId: "00000000-0000-4000-8000-000000000201",
+          roundId: firstQuestion.roundId,
+          answerId: firstQuestion.answers[0].id,
+        },
+      }),
+      app.inject({
+        method: "POST",
+        url: `/api/sessions/${sessionId}/answers`,
+        headers: { authorization: `Bearer ${grace.json().token}` },
+        payload: {
+          submissionId: "00000000-0000-4000-8000-000000000202",
+          roundId: firstQuestion.roundId,
+          answerId: firstQuestion.answers[1].id,
+        },
+      }),
+    ]);
+    expect(submitted.map((response) => response.statusCode)).toEqual([
+      200, 200,
+    ]);
     const firstReveal = await app.inject({
-      method: "POST",
-      url: `/api/sessions/${sessionId}/reveal`,
+      method: "GET",
+      url: `/api/sessions/${sessionId}/host`,
       headers: { cookie },
-      payload: { expectedRevision: 4 },
     });
     expect(firstReveal.statusCode).toBe(200);
     expect(firstReveal.json().results).toEqual(

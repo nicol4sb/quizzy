@@ -184,7 +184,7 @@ export function PlayerJoin({ code }: { code: string }) {
       <main className="player-question">
         <header className="question-header">
           <p>
-            {question.position + 1} / {question.totalQuestions}
+            Question {question.position + 1} of {question.totalQuestions}
           </p>
           <strong className="timer">{secondsRemaining}</strong>
           <p>{question.points} pts</p>
