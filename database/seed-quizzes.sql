@@ -88,7 +88,11 @@ INSERT INTO seed_quiz_data (quiz_key, title, theme, questions) VALUES
 );
 
 CREATE TEMP TABLE seed_quizzes ON COMMIT DROP AS
-SELECT md5(c.id::text || ':' || d.quiz_key)::uuid AS id,
+SELECT overlay(
+         overlay(md5(c.id::text || ':' || d.quiz_key) placing '5' from 13 for 1)
+         placing '8' from 17 for 1
+       )::uuid AS id,
+       md5(c.id::text || ':' || d.quiz_key)::uuid AS legacy_id,
        c.id AS creator_id,
        d.quiz_key,
        d.title,
@@ -102,13 +106,21 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM live_sessions s
-    JOIN seed_quizzes q ON q.id = s.quiz_id
+    JOIN seed_quizzes q ON s.quiz_id IN (q.id, q.legacy_id)
     WHERE s.state <> 'FINISHED'
   ) THEN
     RAISE EXCEPTION 'A seeded quiz has an active session; finish or cancel it before reseeding.';
   END IF;
 END
 $$;
+
+-- Versions of this seed file created before UUID validation was enforced used
+-- raw MD5 values. Remove only those deterministic legacy samples on rerun.
+DELETE FROM quizzes q
+USING seed_quizzes seeded
+WHERE q.id = seeded.legacy_id
+  AND q.creator_id = seeded.creator_id
+  AND seeded.legacy_id <> seeded.id;
 
 INSERT INTO quizzes (id, creator_id, title, theme)
 SELECT id, creator_id, title, theme
@@ -124,7 +136,10 @@ WHERE quiz_id IN (SELECT id FROM seed_quizzes);
 
 WITH expanded_questions AS (
   SELECT q.id AS quiz_id,
-         md5(q.id::text || ':question:' || (question_number - 1)::text)::uuid AS id,
+         overlay(
+           overlay(md5(q.id::text || ':question:' || (question_number - 1)::text) placing '5' from 13 for 1)
+           placing '8' from 17 for 1
+         )::uuid AS id,
          (question_number - 1)::integer AS position,
          question
   FROM seed_quizzes q
@@ -142,7 +157,10 @@ FROM expanded_questions;
 
 WITH expanded_questions AS (
   SELECT q.id AS quiz_id,
-         md5(q.id::text || ':question:' || (question_number - 1)::text)::uuid AS question_id,
+         overlay(
+           overlay(md5(q.id::text || ':question:' || (question_number - 1)::text) placing '5' from 13 for 1)
+           placing '8' from 17 for 1
+         )::uuid AS question_id,
          question
   FROM seed_quizzes q
   CROSS JOIN LATERAL jsonb_array_elements(q.questions)
@@ -157,7 +175,10 @@ expanded_answers AS (
     WITH ORDINALITY AS item(answer, answer_number)
 )
 INSERT INTO answer_options (id, question_id, position, text, is_correct)
-SELECT md5(question_id::text || ':answer:' || position::text)::uuid,
+SELECT overlay(
+         overlay(md5(question_id::text || ':answer:' || position::text) placing '5' from 13 for 1)
+         placing '8' from 17 for 1
+       )::uuid,
        question_id,
        position,
        answer->>0,
