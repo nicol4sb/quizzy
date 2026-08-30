@@ -74,13 +74,18 @@ input {
   width: 2.5rem;
   height: 2.5rem;
   padding: 0.55rem;
+  border: 1px solid #bcb5ff88;
   border-radius: 50%;
-  background: transparent;
+  background: #7566ff33;
+  color: #ffffff;
   transform: translateY(-50%);
 }
 .password-visibility:hover,
 .password-visibility:focus-visible {
-  background: #ffffff18;
+  border-color: #ffffff;
+  background: #7566ff;
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 .password-visibility svg {
   width: 100%;
@@ -89,7 +94,7 @@ input {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.8;
+  stroke-width: 2.4;
 }
 button {
   padding: 0.85rem 1.25rem;
