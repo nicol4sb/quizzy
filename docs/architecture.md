@@ -338,17 +338,19 @@ Deadlines use server time. Browser countdowns are visual aids derived from `clos
 2. API locks the session transactionally.
 3. API verifies `LOBBY` and the revision.
 4. API permanently closes joining.
-5. API creates the first round and stores its deadline.
+5. API creates the first round, stores a ten-second answer-availability timestamp, and stores the later answer deadline.
 6. API changes state, increments revision, and commits.
 7. API publishes `question_opened`.
 8. WebSocket service sends role-appropriate payloads to the host and players.
-9. Player payload contains question and options but not correctness.
+9. Host and player clients show the question position and preview countdown; only the host shows the full prompt.
+10. After ten seconds, both clients reveal matching answer controls and the configured answer timer begins.
+11. Player payload contains question and options but not correctness.
 
 ### Answering
 
 1. Player submits an answer through HTTP with an idempotent submission ID.
 2. API authenticates the anonymous session token.
-3. API verifies session membership, open round, deadline, and option membership.
+3. API verifies session membership, answer-availability time, deadline, and option membership.
 4. API inserts one submission per player and round using a database uniqueness constraint.
 5. API records server receipt time, correctness, and score.
 6. API commits.

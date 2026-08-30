@@ -289,8 +289,9 @@ export async function registerSessionRoutes(app, database) {
             if (!question)
                 throw new Error("Playable quiz has no first question");
             await client.query(`INSERT INTO question_rounds
-           (id, live_session_id, question_id, position, opened_at, closes_at)
-         VALUES ($1, $2, $3, $4, now(), now() + make_interval(secs => $5))`, [
+           (id, live_session_id, question_id, position, opened_at, answers_available_at, closes_at)
+         VALUES ($1, $2, $3, $4, now(), now() + interval '10 seconds',
+                 now() + interval '10 seconds' + make_interval(secs => $5))`, [
                 randomUUID(),
                 session.id,
                 question.id,
@@ -339,7 +340,8 @@ export async function registerSessionRoutes(app, database) {
         let transactionOpen = true;
         try {
             await client.query("BEGIN");
-            const roundResult = await client.query(`SELECT s.revision, s.state, r.opened_at, r.closes_at, now() AS server_now,
+            const roundResult = await client.query(`SELECT s.revision, s.state, r.answers_available_at AS opened_at,
+                r.answers_available_at, r.closes_at, now() AS server_now,
                 a.is_correct AS answer_is_correct, q.points
            FROM live_sessions s
            JOIN question_rounds r ON r.live_session_id = s.id
@@ -369,6 +371,11 @@ export async function registerSessionRoutes(app, database) {
                 await client.query("ROLLBACK");
                 transactionOpen = false;
                 return reply.code(409).send({ error: "Answering is closed." });
+            }
+            if (round.server_now < round.answers_available_at) {
+                await client.query("ROLLBACK");
+                transactionOpen = false;
+                return reply.code(409).send({ error: "Answers are not open yet." });
             }
             await client.query(`INSERT INTO answer_submissions
            (id, question_round_id, player_id, answer_option_id, is_correct, points_awarded)
@@ -466,10 +473,14 @@ export async function registerSessionRoutes(app, database) {
           WHERE id = (
             SELECT id FROM question_rounds
              WHERE live_session_id = $1
+               AND answers_available_at <= now()
              ORDER BY position DESC LIMIT 1
           )`, [session.id]);
-            if (!closed.rowCount)
-                throw new Error("Open session has no question round");
+            if (!closed.rowCount) {
+                await client.query("ROLLBACK");
+                transactionOpen = false;
+                return reply.code(409).send({ error: "Answers are not open yet." });
+            }
             const updated = await client.query(`UPDATE live_sessions
             SET state = 'RESULTS', revision = revision + 1
           WHERE id = $1 RETURNING revision`, [session.id]);
@@ -543,8 +554,9 @@ export async function registerSessionRoutes(app, database) {
                 return reply.code(409).send({ error: "There are no more questions." });
             }
             await client.query(`INSERT INTO question_rounds
-           (id, live_session_id, question_id, position, opened_at, closes_at)
-         VALUES ($1, $2, $3, $4, now(), now() + make_interval(secs => $5))`, [
+           (id, live_session_id, question_id, position, opened_at, answers_available_at, closes_at)
+         VALUES ($1, $2, $3, $4, now(), now() + interval '10 seconds',
+                 now() + interval '10 seconds' + make_interval(secs => $5))`, [
                 randomUUID(),
                 session.id,
                 question.id,

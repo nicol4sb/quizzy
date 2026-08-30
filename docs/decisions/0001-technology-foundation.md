@@ -10,7 +10,7 @@ Quizzy starts as one Node.js application process using TypeScript, Fastify, `@fa
 
 This is a lean single-process alpha deployment with explicit HTTP, realtime, database, and browser boundaries. It avoids Docker, Redis, an ORM, server-side rendering, and separate services before they provide demonstrated value. The `RoomEventBus` uses memory initially and can later be backed by Redis without changing game logic or browser contracts.
 
-The disposable alpha uses one canonical `database/schema.sql` rather than an automated migration framework. Production schema changes, once needed, are applied deliberately with documented `ALTER` statements.
+The disposable alpha uses one canonical `database/schema.sql` rather than a versioned migration framework. The process transactionally applies this additive, idempotent schema under a PostgreSQL advisory lock before accepting traffic. Destructive or data-transforming production changes still require a separate deliberate migration.
 
 ## Consequences
 

@@ -65,6 +65,17 @@ async function createQuiz(
   return response.json().quiz.id as string;
 }
 
+async function openAnswers(roundId: string): Promise<void> {
+  await pool.query(
+    `UPDATE question_rounds r
+        SET answers_available_at = now() - interval '1 millisecond',
+            closes_at = now() + make_interval(secs => q.time_limit_seconds)
+       FROM questions q
+      WHERE r.id = $1 AND q.id = r.question_id`,
+    [roundId],
+  );
+}
+
 describe("live session launch", () => {
   it("launches an owned playable quiz with a unique public join code", async () => {
     const cookie = await register("host@example.com");
@@ -418,6 +429,17 @@ describe("live session launch", () => {
     );
     expect(JSON.stringify(playerSnapshot.json())).not.toContain("correct");
 
+    const earlyReveal = await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/reveal`,
+      headers: { cookie },
+      payload: { expectedRevision: 3 },
+    });
+    expect(earlyReveal.statusCode).toBe(409);
+    expect(earlyReveal.json()).toEqual({ error: "Answers are not open yet." });
+
+    await openAnswers(started.json().question.roundId);
+
     expect(
       (
         await app.inject({
@@ -624,9 +646,19 @@ describe("live session launch", () => {
       ).statusCode,
     ).toBe(401);
 
+    const tooEarly = await app.inject({
+      method: "POST",
+      url: `/api/sessions/${sessionId}/answers`,
+      headers: { authorization: `Bearer ${joined.json().token}` },
+      payload,
+    });
+    expect(tooEarly.statusCode).toBe(409);
+    expect(tooEarly.json()).toEqual({ error: "Answers are not open yet." });
+
     await pool.query(
       `UPDATE question_rounds
           SET opened_at = now() - interval '2 minutes',
+              answers_available_at = now() - interval '2 minutes',
               closes_at = now() - interval '1 minute'
         WHERE id = $1`,
       [payload.roundId],
@@ -691,6 +723,7 @@ describe("live session launch", () => {
       expect.objectContaining({ position: 0, totalQuestions: 2 }),
     );
     const firstQuestion = first.json().question;
+    await openAnswers(firstQuestion.roundId);
     const submitted = await Promise.all([
       app.inject({
         method: "POST",
@@ -763,6 +796,7 @@ describe("live session launch", () => {
       }),
     );
     const secondQuestion = second.json().question;
+    await openAnswers(secondQuestion.roundId);
     await app.inject({
       method: "POST",
       url: `/api/sessions/${sessionId}/answers`,
@@ -854,6 +888,7 @@ describe("live session launch", () => {
       headers: { cookie },
       payload: { expectedRevision: 2 },
     });
+    await openAnswers(started.json().question.roundId);
     await app.inject({
       method: "POST",
       url: `/api/sessions/${sessionId}/answers`,

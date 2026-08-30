@@ -69,6 +69,7 @@ export function PlayerJoin({ code }: { code: string }) {
   const [reconnecting, setReconnecting] = useState(false);
   const [error, setError] = useState("");
   const secondsRemaining = useCountdown(question?.closesAt);
+  const answerRevealRemaining = useCountdown(question?.answersAvailableAt);
 
   useEffect(() => {
     if (joined) {
@@ -239,7 +240,14 @@ export function PlayerJoin({ code }: { code: string }) {
   }
 
   async function submitAnswer(answerId: string) {
-    if (!joined || !question || answered || answering || secondsRemaining === 0)
+    if (
+      !joined ||
+      !question ||
+      answered ||
+      answering ||
+      answerRevealRemaining > 0 ||
+      secondsRemaining === 0
+    )
       return;
     setSelectedAnswerId(answerId);
     setAnswering(true);
@@ -305,27 +313,48 @@ export function PlayerJoin({ code }: { code: string }) {
           <p>
             Question {question.position + 1} of {question.totalQuestions}
           </p>
-          <strong className="timer">{secondsRemaining}</strong>
+          <strong className="timer">
+            {answerRevealRemaining || secondsRemaining}
+          </strong>
           <p>{question.points} pts</p>
         </header>
         <div className="remote-prompt">
           <p className="eyebrow">Use the main screen</p>
-          <h1>Choose an answer</h1>
+          <h1>
+            {answerRevealRemaining > 0 ? "Get ready…" : "Choose an answer"}
+          </h1>
         </div>
+        {answerRevealRemaining > 0 && (
+          <div className="question-preview-track" aria-hidden="true">
+            <span
+              style={{
+                width: `${Math.min(100, (10 - answerRevealRemaining) * 10)}%`,
+              }}
+            />
+          </div>
+        )}
         <div className="answer-grid player-answers">
-          {question.answers.map((answer, index) => (
-            <button
-              className={`answer-option answer-${index % 4}${selectedAnswerId === answer.id ? " selected" : ""}`}
-              key={answer.id}
-              aria-label={`Answer ${String.fromCharCode(65 + index)}`}
-              disabled={answered || answering || secondsRemaining === 0}
-              onClick={() => void submitAnswer(answer.id)}
-            >
-              <span aria-hidden="true">{String.fromCharCode(65 + index)}</span>
-            </button>
-          ))}
+          {question.answers.map((answer, index) => {
+            const answerLabel = String.fromCharCode(65 + index);
+            const locked = answerRevealRemaining > 0;
+            return (
+              <button
+                className={`answer-option answer-${index % 4}${locked ? " locked" : " unlocked"}${selectedAnswerId === answer.id ? " selected" : ""}`}
+                key={answer.id}
+                aria-label={`Answer ${answerLabel}${locked ? ", locked" : ""}`}
+                disabled={
+                  locked || answered || answering || secondsRemaining === 0
+                }
+                onClick={() => void submitAnswer(answer.id)}
+              >
+                <span aria-hidden="true">{answerLabel}</span>
+                {locked && <small>Locked</small>}
+              </button>
+            );
+          })}
         </div>
-        {answered ? <p>Answer received!</p> : <p>Choose one answer.</p>}
+        {answerRevealRemaining === 0 &&
+          (answered ? <p>Answer received!</p> : <p>Choose one answer.</p>)}
         {error && <p className="error">{error}</p>}
       </main>
     );

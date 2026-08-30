@@ -2,10 +2,12 @@ import "dotenv/config";
 import { buildApp } from "./app.js";
 import { readConfig } from "./config.js";
 import { createDatabasePool } from "./database/pool.js";
+import { applyDatabaseSchema } from "./database/schema.js";
 import { InMemoryRoomEventBus } from "./realtime/in-memory-room-event-bus.js";
 
 const config = readConfig();
 const pool = createDatabasePool(config.DATABASE_URL);
+await applyDatabaseSchema(pool);
 const app = await buildApp({
   pool,
   eventBus: new InMemoryRoomEventBus(),

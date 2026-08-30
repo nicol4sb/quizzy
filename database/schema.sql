@@ -97,13 +97,24 @@ CREATE TABLE IF NOT EXISTS question_rounds (
   question_id uuid NOT NULL REFERENCES questions(id) ON DELETE RESTRICT,
   position integer NOT NULL,
   opened_at timestamptz NOT NULL,
+  answers_available_at timestamptz NOT NULL,
   closes_at timestamptz NOT NULL,
   closed_at timestamptz,
   CONSTRAINT question_rounds_position_valid CHECK (position >= 0),
-  CONSTRAINT question_rounds_deadline_valid CHECK (closes_at > opened_at),
+  CONSTRAINT question_rounds_answer_window_valid CHECK (
+    answers_available_at >= opened_at AND closes_at > answers_available_at
+  ),
   UNIQUE (live_session_id, position),
   UNIQUE (live_session_id, question_id)
 );
+
+-- Keep disposable alpha databases created from an earlier schema usable.
+ALTER TABLE question_rounds
+  ADD COLUMN IF NOT EXISTS answers_available_at timestamptz DEFAULT now();
+ALTER TABLE question_rounds
+  ALTER COLUMN answers_available_at SET NOT NULL;
+ALTER TABLE question_rounds
+  ALTER COLUMN answers_available_at DROP DEFAULT;
 
 CREATE INDEX IF NOT EXISTS question_rounds_session_open_idx
   ON question_rounds(live_session_id, opened_at DESC);

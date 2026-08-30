@@ -36,7 +36,7 @@ Launch a saved quiz:
 10. Confirm a second tap cannot change the submitted answer and the phone never indicates whether it was correct.
 11. Confirm an answer after the countdown reaches zero is rejected and that a new player can no longer join.
 12. Click **Show results** and confirm the correct option, votes per option, and top-five leaderboard appear on both screens.
-13. Click **Next question**, answer again, and confirm scores accumulate after the next reveal. A correct answer submitted halfway through its timer should receive approximately 75% of its configured points; one at the deadline receives half.
+13. Click **Next question** and confirm the host shows only the question for ten seconds with a preview progress bar. Confirm answer controls appear simultaneously on the host and phones, then answer and verify scores accumulate after reveal. A correct answer submitted halfway through its answer timer should receive approximately 75% of its configured points; one at the deadline receives half.
 14. On the final result screen click **Finish quiz** and confirm both screens show the top-three podium and final leaderboard.
 15. Return to the dashboard and confirm the completed quiz can launch again.
 

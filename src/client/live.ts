@@ -8,6 +8,7 @@ export type LiveQuestion = {
   points: number;
   timeLimitSeconds: number;
   openedAt: string;
+  answersAvailableAt: string;
   closesAt: string;
   answers: { id: string; text: string; position: number }[];
 };

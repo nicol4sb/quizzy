@@ -366,12 +366,32 @@ button.danger {
   background: #111026;
   text-align: center;
 }
+.question-screen {
+  min-height: 100svh;
+  padding: clamp(0.8rem, 2vw, 2rem);
+  gap: clamp(0.7rem, 1.5vw, 1.4rem);
+}
 .question-screen h1,
 .player-question h1 {
   margin: 0 auto;
   max-width: 70rem;
   font-size: clamp(2rem, 6vw, 5rem);
   line-height: 1.05;
+}
+.question-screen h1 {
+  max-width: 96vw;
+  font-size: clamp(2.8rem, 6.7vw, 7.5rem);
+  line-height: 0.98;
+}
+.question-screen .answer-grid {
+  width: 100%;
+  min-height: min(42vh, 30rem);
+}
+.question-screen .answer-option {
+  min-height: clamp(8rem, 19vh, 15rem);
+  padding: clamp(1rem, 2.5vw, 2.5rem);
+  font-size: clamp(1.8rem, 4vw, 4.25rem);
+  line-height: 1.08;
 }
 .question-header {
   display: grid;
@@ -416,6 +436,24 @@ button.danger {
 .player-answers .answer-option span {
   font-size: clamp(3rem, 18vw, 6rem);
   line-height: 1;
+}
+.player-answers .answer-option small {
+  margin-top: 0.45rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid #ffffff99;
+  border-radius: 999px;
+  background: #111026aa;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.player-answers .answer-option.locked {
+  border-color: #ffffff55;
+  filter: saturate(0.25) brightness(0.7);
+  opacity: 0.65;
+}
+.player-answers .answer-option.unlocked {
+  animation: answers-unlocked 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .remote-prompt h1 {
   font-size: clamp(2rem, 10vw, 3.5rem);
@@ -469,6 +507,31 @@ button.danger {
   background: linear-gradient(90deg, transparent, #ffffff88, transparent);
   content: "";
   animation: progress-shimmer 1.4s linear infinite;
+}
+.question-preview-progress {
+  display: grid;
+  gap: 0.8rem;
+  width: min(42rem, 90vw);
+  margin: 0 auto;
+  color: #bcb5ff;
+  font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+}
+.question-preview-track {
+  width: min(42rem, 90vw);
+  height: 0.9rem;
+  overflow: hidden;
+  margin: 0 auto;
+  border: 1px solid #ffffff44;
+  border-radius: 999px;
+  background: #090817;
+}
+.question-preview-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff5cb8, #7566ff);
+  box-shadow: 0 0 1rem #ff5cb899;
+  transition: width 1s linear;
 }
 .reveal-button {
   justify-self: center;
@@ -696,6 +759,16 @@ button.danger {
     transform: translateX(300%);
   }
 }
+@keyframes answers-unlocked {
+  from {
+    filter: saturate(0.25) brightness(0.7);
+    transform: scale(0.92);
+  }
+  to {
+    filter: none;
+    transform: scale(1);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .join-celebration,
   .join-celebration span,
@@ -707,6 +780,12 @@ button.danger {
   }
   .answer-progress-track > span {
     transition: none;
+  }
+  .question-preview-track span {
+    transition: none;
+  }
+  .player-answers .answer-option.unlocked {
+    animation: none;
   }
 }
 .answer-0 {

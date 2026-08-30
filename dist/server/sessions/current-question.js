@@ -1,6 +1,6 @@
 export async function currentQuestion(database, sessionId) {
     const questionResult = await database.query(`SELECT r.id AS round_id, q.prompt, r.position, q.points,
-            q.time_limit_seconds, r.opened_at, r.closes_at,
+            q.time_limit_seconds, r.opened_at, r.answers_available_at, r.closes_at,
             (SELECT count(*)::integer FROM questions all_q WHERE all_q.quiz_id = q.quiz_id) AS total_questions
        FROM question_rounds r
        JOIN questions q ON q.id = r.question_id
@@ -23,6 +23,7 @@ export async function currentQuestion(database, sessionId) {
         points: question.points,
         timeLimitSeconds: question.time_limit_seconds,
         openedAt: question.opened_at,
+        answersAvailableAt: question.answers_available_at,
         closesAt: question.closes_at,
         answers: answers.rows,
     };

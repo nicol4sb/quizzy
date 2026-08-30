@@ -11,9 +11,8 @@
 1. Copy `.env.example` to `.env` and change the PostgreSQL credentials.
 2. Create the configured development database and user.
 3. Run `npm install`.
-4. Apply `database/schema.sql` with `psql "$DATABASE_URL" -f database/schema.sql` whenever the schema contains product tables.
-5. Run `npm run dev` to start the Fastify server and Vite together.
-6. Open the Vite URL shown in the client log. For phone testing, use the network URL containing the laptop's LAN IP rather than `localhost`.
+4. Run `npm run dev` to start the Fastify server and Vite together. The server transactionally applies the additive, idempotent `database/schema.sql` before listening.
+5. Open the Vite URL shown in the client log. For phone testing, use the network URL containing the laptop's LAN IP rather than `localhost`.
 
 React and CSS changes use hot-module replacement. Server changes restart the Fastify process automatically. One `Ctrl+C` stops both processes.
 
@@ -32,7 +31,7 @@ git commit -m "Describe the release"
 git push origin main
 ```
 
-The VPS must have its runtime dependencies installed once with `npm ci --omit=dev`. Repeat that manually whenever `package-lock.json` changes because the existing deployment script does not install dependencies. Keep the production `.env` outside Git. Apply deliberate production SQL `ALTER` statements separately before restarting when a schema change requires them.
+The VPS must have its runtime dependencies installed once with `npm ci --omit=dev`. Repeat that manually whenever `package-lock.json` changes because the existing deployment script does not install dependencies. Keep the production `.env` outside Git. On restart, the server takes a PostgreSQL advisory transaction lock and applies the canonical schema before accepting traffic. Keep this file limited to additive, repeatable `CREATE ... IF NOT EXISTS` and `ALTER ... IF NOT EXISTS` operations; destructive or data-transforming migrations require a separate deliberate production procedure.
 
 ## Verification
 

@@ -52,6 +52,7 @@ export function HostLobby({ sessionId, onClose }: Props) {
     useState<LeaderboardEntry[]>();
   const [error, setError] = useState("");
   const secondsRemaining = useCountdown(question?.closesAt);
+  const answerRevealRemaining = useCountdown(question?.answersAvailableAt);
 
   useEffect(() => {
     async function loadSnapshot() {
@@ -362,43 +363,60 @@ export function HostLobby({ sessionId, onClose }: Props) {
           <p>
             Question {question.position + 1} of {question.totalQuestions}
           </p>
-          <strong className="timer">{secondsRemaining}</strong>
+          <strong className="timer">
+            {answerRevealRemaining || secondsRemaining}
+          </strong>
           <p>{question.points} points</p>
         </header>
         <h1>{question.prompt}</h1>
-        <section className="answer-progress" aria-live="polite">
-          <div className="answer-progress-copy">
-            <strong>{progress.answeredCount} answered</strong>
-            <span>{progress.totalPlayers} players</span>
-          </div>
-          <div
-            className="answer-progress-track"
-            role="progressbar"
-            aria-label="Players who have answered"
-            aria-valuemin={0}
-            aria-valuemax={progress.totalPlayers}
-            aria-valuenow={progress.answeredCount}
-          >
-            <span
-              style={{
-                width: `${progress.totalPlayers ? (progress.answeredCount / progress.totalPlayers) * 100 : 0}%`,
-              }}
-            />
-          </div>
-        </section>
-        <div className="answer-grid">
-          {question.answers.map((answer, index) => (
-            <div
-              className={`answer-option answer-${index % 4}`}
-              key={answer.id}
-            >
-              {answer.text}
+        {answerRevealRemaining > 0 ? (
+          <section className="question-preview-progress" aria-live="polite">
+            <strong>Answers appear in {answerRevealRemaining}s</strong>
+            <div className="question-preview-track" aria-hidden="true">
+              <span
+                style={{
+                  width: `${Math.min(100, (10 - answerRevealRemaining) * 10)}%`,
+                }}
+              />
             </div>
-          ))}
-        </div>
+          </section>
+        ) : (
+          <>
+            <section className="answer-progress" aria-live="polite">
+              <div className="answer-progress-copy">
+                <strong>{progress.answeredCount} answered</strong>
+                <span>{progress.totalPlayers} players</span>
+              </div>
+              <div
+                className="answer-progress-track"
+                role="progressbar"
+                aria-label="Players who have answered"
+                aria-valuemin={0}
+                aria-valuemax={progress.totalPlayers}
+                aria-valuenow={progress.answeredCount}
+              >
+                <span
+                  style={{
+                    width: `${progress.totalPlayers ? (progress.answeredCount / progress.totalPlayers) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </section>
+            <div className="answer-grid">
+              {question.answers.map((answer, index) => (
+                <div
+                  className={`answer-option answer-${index % 4}`}
+                  key={answer.id}
+                >
+                  {answer.text}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         <button
           className="reveal-button"
-          disabled={transitioning}
+          disabled={transitioning || answerRevealRemaining > 0}
           onClick={() => void reveal()}
         >
           {transitioning ? "Revealing…" : "Show results"}
