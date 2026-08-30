@@ -12,6 +12,7 @@ function App() {
   const [mode, setMode] = useState<"register" | "login">("register");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -79,6 +80,7 @@ function App() {
             className={mode === "register" ? "active" : "secondary"}
             onClick={() => {
               setMode("register");
+              setShowPassword(false);
               setError("");
             }}
           >
@@ -88,6 +90,7 @@ function App() {
             className={mode === "login" ? "active" : "secondary"}
             onClick={() => {
               setMode("login");
+              setShowPassword(false);
               setError("");
             }}
           >
@@ -101,15 +104,33 @@ function App() {
           </label>
           <label>
             Password
-            <input
-              name="password"
-              type="password"
-              autoComplete={
-                mode === "register" ? "new-password" : "current-password"
-              }
-              minLength={12}
-              required
-            />
+            <span className="password-field">
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete={
+                  mode === "register" ? "new-password" : "current-password"
+                }
+                minLength={12}
+                required
+              />
+              {mode === "login" && (
+                <button
+                  type="button"
+                  className="password-visibility"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2.2 12s3.4-6 9.8-6 9.8 6 9.8 6-3.4 6-9.8 6-9.8-6-9.8-6Z" />
+                    <circle cx="12" cy="12" r="2.8" />
+                    {showPassword && <path d="m4 4 16 16" />}
+                  </svg>
+                </button>
+              )}
+            </span>
           </label>
           {error && (
             <p className="error" role="alert">
