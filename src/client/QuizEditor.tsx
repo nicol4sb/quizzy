@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useEffect, useRef, type FormEvent, type ReactNode } from "react";
 import { newQuestion, type QuizDraft } from "./quizzes";
 import { hasRichFormatting, RichText } from "./RichText";
 
@@ -10,6 +10,37 @@ type Props = {
   onCancel: () => void;
   onSave: () => Promise<void>;
 };
+
+function FormattingHelp({ children }: { children: ReactNode }) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    function dismiss(event: PointerEvent) {
+      const details = detailsRef.current;
+      if (details?.open && !details.contains(event.target as Node))
+        details.open = false;
+    }
+    function dismissOnEscape(event: KeyboardEvent) {
+      const details = detailsRef.current;
+      if (event.key === "Escape" && details?.open) {
+        details.open = false;
+        details.querySelector("summary")?.focus();
+      }
+    }
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, []);
+
+  return (
+    <details className="formatting-help" ref={detailsRef}>
+      {children}
+    </details>
+  );
+}
 
 export function QuizEditor({
   quiz,
@@ -67,6 +98,7 @@ export function QuizEditor({
               onChange({ ...quiz, title: event.target.value })
             }
           />
+          <small className="field-hint">Up to 72 characters · plain text</small>
         </label>
         <label>
           Theme
@@ -89,7 +121,7 @@ export function QuizEditor({
       {quiz.questions.map((question, questionIndex) => (
         <fieldset className="question-card" key={question.clientId}>
           <legend>Question {questionIndex + 1}</legend>
-          <details className="formatting-help">
+          <FormattingHelp>
             <summary aria-label="Show code and math formatting examples">
               <span className="formatting-info-icon" aria-hidden="true">
                 i
@@ -124,7 +156,7 @@ export function QuizEditor({
                 </dd>
               </dl>
             </div>
-          </details>
+          </FormattingHelp>
           <div className="question-actions">
             <button
               type="button"
@@ -168,6 +200,9 @@ export function QuizEditor({
                 updateQuestion(questionIndex, { prompt: event.target.value })
               }
             />
+            <small className="field-hint">
+              Up to 180 characters · code and LaTeX supported
+            </small>
           </label>
           {hasRichFormatting(question.prompt) && (
             <div className="rich-preview">
@@ -238,6 +273,9 @@ export function QuizEditor({
                     })
                   }
                 />
+                <small className="field-hint answer-field-hint">
+                  Up to 200 characters · code and LaTeX supported
+                </small>
                 <button
                   type="button"
                   className="danger compact"

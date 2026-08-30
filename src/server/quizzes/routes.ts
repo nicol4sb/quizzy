@@ -5,7 +5,11 @@ import { z } from "zod";
 import { findCurrentCreator } from "../auth/current-creator.js";
 import { sessionCookieName } from "../auth/session.js";
 import type { Database } from "../database/types.js";
-import { quizInputSchema, type QuizInput } from "./schema.js";
+import {
+  legacyQuizInputSchema,
+  quizInputSchema,
+  type QuizInput,
+} from "./schema.js";
 
 type QuizRow = {
   quiz_id: string;
@@ -190,7 +194,7 @@ export async function registerQuizRoutes(
     if (!creatorId)
       return reply.code(401).send({ error: "Not authenticated." });
     const parsedId = idSchema.safeParse((request.params as { id?: string }).id);
-    const parsed = quizInputSchema.safeParse(request.body);
+    const parsed = legacyQuizInputSchema.safeParse(request.body);
     if (!parsedId.success)
       return reply.code(404).send({ error: "Quiz not found." });
     if (!parsed.success)

@@ -50,6 +50,11 @@ label {
   gap: 0.45rem;
   font-weight: 700;
 }
+.field-hint {
+  color: #aaa4ce;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
 input {
   width: 100%;
   padding: 0.9rem 1rem;
@@ -315,6 +320,9 @@ textarea {
   text-transform: uppercase;
 }
 .answer-rich-preview {
+  grid-column: 2 / -1;
+}
+.answer-field-hint {
   grid-column: 2 / -1;
 }
 .rich-text {

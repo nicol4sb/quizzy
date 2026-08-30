@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { findCurrentCreator } from "../auth/current-creator.js";
 import { sessionCookieName } from "../auth/session.js";
-import { quizInputSchema } from "./schema.js";
+import { legacyQuizInputSchema, quizInputSchema, } from "./schema.js";
 async function authenticatedCreatorId(request, database) {
     return (await findCurrentCreator(database, request.cookies[sessionCookieName]))?.id;
 }
@@ -127,7 +127,7 @@ export async function registerQuizRoutes(app, database) {
         if (!creatorId)
             return reply.code(401).send({ error: "Not authenticated." });
         const parsedId = idSchema.safeParse(request.params.id);
-        const parsed = quizInputSchema.safeParse(request.body);
+        const parsed = legacyQuizInputSchema.safeParse(request.body);
         if (!parsedId.success)
             return reply.code(404).send({ error: "Quiz not found." });
         if (!parsed.success)
