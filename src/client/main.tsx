@@ -46,7 +46,7 @@ const demoSequences: Record<
     question: "Which function does this series evaluate?",
     source: "$$\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}$$",
     answers: [
-      "Riemann zeta function, $$\\zeta(2)$$",
+      "Riemann zeta, $$\\zeta(2)$$",
       "The Gamma function, $$\\Gamma(2)$$",
       "A Fourier series coefficient",
     ],
@@ -57,7 +57,7 @@ const demoSequences: Record<
     answers: ["```js [2, 3]```", "```js [1, 2, 3]```", "```js [1]```"],
   },
 };
-const demoSlideStages = [0, 1, 5, 6];
+const demoSlideStages = [0, 5, 6];
 const studentAnswerOrder = [0, 4, 7, 2, 5, 1, 6, 3];
 const studentAnswers = [1, 2, 3, 1, 2, 3, 2, 1];
 const studentFigures = [
@@ -425,7 +425,7 @@ function MathDemoReel({
   loggedIn: boolean;
   showNavigation: boolean;
 }) {
-  const [mode, setMode] = useState<DemoMode>("math");
+  const [mode, setMode] = useState<DemoMode>("code");
   const sequence = demoSequences[mode];
   const fullText = sequence.question + " " + sequence.source;
   const [stage, setStage] = useState(0);
@@ -500,7 +500,7 @@ function MathDemoReel({
 
   const typed = fullText.slice(0, typedLength);
   const answeredCount = stage === 5 ? responses : 0;
-  const currentSlide = stage === 0 ? 0 : stage <= 4 ? 1 : stage === 5 ? 2 : 3;
+  const currentSlide = stage <= 4 ? 0 : stage === 5 ? 1 : 2;
 
   const goToSlide = useCallback(
     (index: number) => {
@@ -510,9 +510,6 @@ function MathDemoReel({
       setShowResultsCta(false);
       if (target === 0) {
         setTypedLength(0);
-        setAnswerTypedLength(0);
-        setResponses(0);
-      } else if (target === 1) {
         setAnswerTypedLength(0);
         setResponses(0);
       } else if (target === 5) {
@@ -547,19 +544,6 @@ function MathDemoReel({
       }`}
       aria-label="Interactive Quizzy demo. Use the arrow keys or slide dots to navigate."
     >
-      <section
-        className="demo-reel-screen demo-reel-editor-screen"
-        key={`editor-${mode}`}
-      >
-        <small>
-          1 · Create the {mode === "math" ? "math" : "JavaScript"} question
-        </small>
-        <div className="demo-typing-surface" aria-live="polite">
-          <span>{typed}</span>
-          <span className="demo-caret" aria-hidden="true" />
-        </div>
-      </section>
-
       <section
         className="demo-reel-screen demo-reel-quiz-screen"
         key={`quiz-${mode}`}
@@ -627,15 +611,24 @@ function MathDemoReel({
           </div>
         ) : (
           <>
-            <div className="demo-reel-live-badge">
-              <span className="demo-reel-live-dot" aria-hidden="true" />
-              <strong>LIVE QUIZ</strong>
-              <span>Question 1 of 6</span>
-            </div>
-            <div className="demo-reel-question-card">
-              <small>Rendered question</small>
-              <p>{sequence.question}</p>
-              <RichText text={sequence.source} />
+            <div
+              className={`demo-reel-question-card${stage === 0 ? " is-creating" : ""}`}
+            >
+              {stage === 0 ? (
+                <>
+                  <small>Create a quiz · JavaScript</small>
+                  <div className="demo-typing-surface" aria-live="polite">
+                    <span>{typed}</span>
+                    <span className="demo-caret" aria-hidden="true" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <small>Rendered question</small>
+                  <p>{sequence.question}</p>
+                  <RichText text={sequence.source} />
+                </>
+              )}
             </div>
             <div
               className="demo-reel-answer-list"
@@ -657,7 +650,12 @@ function MathDemoReel({
                     <b>{index + 1}</b>
                     {isComplete && hasRichFormatting(answer) ? (
                       <div className="demo-reel-answer-rich">
-                        <RichText text={answer} />
+                        <RichText
+                          text={answer.replace(
+                            /\$\$([\s\S]*?)\$\$/g,
+                            "\\($1\\)",
+                          )}
+                        />
                       </div>
                     ) : (
                       <span>{answerText}</span>

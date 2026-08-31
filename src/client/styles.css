@@ -973,16 +973,6 @@ button:disabled {
     transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.5s ease;
 }
-.demo-reel-editor-screen {
-  z-index: 3;
-  flex-direction: column;
-  justify-content: center;
-  gap: clamp(0.8rem, 2vw, 1.5rem);
-  background:
-    radial-gradient(circle at 15% 15%, #7566ff35, transparent 36%),
-    linear-gradient(150deg, #201a41, #111026 65%, #172b35);
-}
-.demo-reel-editor-screen > small,
 .demo-reel-results-screen > small,
 .demo-reel-question-card > small {
   color: #aaa4ce;
@@ -990,14 +980,6 @@ button:disabled {
   font-weight: 850;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-}
-.demo-reel-editor-screen .demo-typing-surface {
-  width: min(100%, 60rem);
-  min-height: clamp(8rem, 24vh, 14rem);
-  margin: 0 auto;
-  padding: 1rem 0.2rem 1.25rem;
-  border-bottom-color: #ffffff66;
-  font-size: clamp(1.4rem, 3.6vw, 3.2rem);
 }
 .demo-reel-quiz-screen {
   z-index: 2;
@@ -1009,30 +991,6 @@ button:disabled {
     radial-gradient(circle at 85% 12%, #55c7d52a, transparent 35%),
     linear-gradient(150deg, #16243c, #11172a 60%, #1f293f);
   transform: translateY(100%);
-}
-.demo-reel-live-badge {
-  display: flex;
-  order: -1;
-  align-items: center;
-  align-self: center;
-  gap: 0.45rem;
-  color: #d8d4ff;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-.demo-reel-live-badge strong {
-  color: #fff;
-  font-size: 0.68rem;
-  letter-spacing: 0.1em;
-}
-.demo-reel-live-dot {
-  width: 0.48rem;
-  height: 0.48rem;
-  border-radius: 50%;
-  background: #ff718f;
-  box-shadow: 0 0 0 0 #ff718f88;
-  animation: demo-live-pulse 1.6s ease-out infinite;
 }
 .demo-reel-question-card {
   display: grid;
@@ -1046,6 +1004,19 @@ button:disabled {
   border-radius: 1rem;
   background: #090817b8;
   box-shadow: 0 1.5rem 3rem #0003;
+}
+.demo-reel-question-card.is-creating {
+  align-content: center;
+}
+.demo-reel-question-card.is-creating .demo-typing-surface {
+  width: 100%;
+  min-width: 0;
+  min-height: clamp(4.5rem, 12vh, 7rem);
+  max-height: clamp(4.5rem, 12vh, 7rem);
+  padding: 0.45rem 0.2rem 0.7rem;
+  border-bottom-color: #ffffff66;
+  font-size: clamp(0.9rem, 1.8vw, 1.45rem);
+  line-height: 1.2;
 }
 .demo-reel-question-card p {
   margin: 0;
@@ -1133,26 +1104,54 @@ button:disabled {
 .demo-reel-answer span {
   min-width: 0;
   overflow: hidden;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .demo-reel-answer-rich {
+  display: block;
+  flex: 1 1 0;
   min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  height: 1.15em;
   overflow: hidden;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  font-size: 0.78em;
+  line-height: 1;
+  white-space: nowrap;
 }
 .demo-reel-answer-rich .rich-text {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
   overflow: hidden;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  text-overflow: ellipsis;
+  line-height: 1;
+  white-space: nowrap;
+}
+.demo-reel-answer-rich .rich-plain,
+.demo-reel-answer-rich .rich-math,
+.demo-reel-answer-rich .rich-inline-code,
+.demo-reel-answer-rich .rich-code-block {
+  display: inline;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.demo-reel-answer-rich .rich-plain {
+  min-width: 0;
 }
 .demo-reel-answer-rich .rich-math-display {
+  display: inline;
   margin: 0;
   overflow: visible;
 }
 .demo-reel-answer-rich .rich-math-display .katex-display {
+  display: inline;
   margin: 0;
+}
+.demo-reel-answer-rich .katex-display > .katex,
+.demo-reel-answer-rich .katex-display > .katex > .katex-html {
+  display: inline;
 }
 .demo-reel-answer-rich .rich-inline-code {
   color: #9df5c8;
@@ -1160,6 +1159,7 @@ button:disabled {
   font-size: 0.9em;
 }
 .demo-reel-answer-rich .rich-code-block {
+  width: auto;
   max-height: none;
   margin: 0;
   padding: 0;
@@ -1171,6 +1171,14 @@ button:disabled {
   white-space: nowrap;
 }
 .demo-reel-answer-rich .rich-code-block code {
+  display: inline;
+  white-space: nowrap;
+}
+.demo-reel-answer-rich .katex,
+.demo-reel-answer-rich .katex-html {
+  display: inline-block;
+  max-width: 100%;
+  line-height: 1;
   white-space: nowrap;
 }
 .demo-reel-answer .demo-caret {
@@ -1516,9 +1524,6 @@ button:disabled {
 .demo-reel-phase-5 .demo-reel-response-bar .demo-response-timer-track span {
   animation: demo-response-countdown 3.6s ease-in both;
 }
-.demo-reel-phase-5 .demo-reel-live-badge {
-  display: none;
-}
 .demo-reel-results-screen {
   z-index: 4;
   align-items: center;
@@ -1715,32 +1720,20 @@ button:disabled {
   outline: none;
   transform: scale(1.04);
 }
-.demo-reel-phase-0 .demo-reel-editor-screen {
-  transform: translateY(0);
-}
 .demo-reel-phase-0 .demo-reel-quiz-screen,
-.demo-reel-phase-0 .demo-reel-results-screen {
-  transform: translateY(100%);
-}
-.demo-reel-phase-0 .demo-reel-results-screen {
-  opacity: 0;
-  transform: translateY(0);
-}
-.demo-reel-phase-1 .demo-reel-editor-screen,
-.demo-reel-phase-2 .demo-reel-editor-screen,
-.demo-reel-phase-3 .demo-reel-editor-screen,
-.demo-reel-phase-4 .demo-reel-editor-screen,
-.demo-reel-phase-5 .demo-reel-editor-screen,
-.demo-reel-phase-6 .demo-reel-quiz-screen,
-.demo-reel-phase-6 .demo-reel-editor-screen {
-  opacity: 0;
-  transform: translateY(0);
-}
 .demo-reel-phase-1 .demo-reel-quiz-screen,
 .demo-reel-phase-2 .demo-reel-quiz-screen,
 .demo-reel-phase-3 .demo-reel-quiz-screen,
 .demo-reel-phase-4 .demo-reel-quiz-screen,
 .demo-reel-phase-5 .demo-reel-quiz-screen {
+  transform: translateY(0);
+}
+.demo-reel-phase-0 .demo-reel-results-screen {
+  opacity: 0;
+  transform: translateY(0);
+}
+.demo-reel-phase-6 .demo-reel-quiz-screen {
+  opacity: 0;
   transform: translateY(0);
 }
 .demo-reel-phase-6 .demo-reel-results-screen {
@@ -5041,19 +5034,18 @@ button.danger {
   .demo-reel-screen {
     padding: 0.8rem 0.8rem 1.6rem;
   }
-  .demo-reel-editor-screen {
-    gap: 0.65rem;
-  }
-  .demo-reel-editor-screen > small,
   .demo-reel-results-screen > small,
   .demo-reel-question-card > small {
     font-size: 0.56rem;
     letter-spacing: 0.07em;
   }
-  .demo-reel-editor-screen .demo-typing-surface {
-    min-height: 7rem;
-    font-size: 1rem;
-    line-height: 1.35;
+  .demo-reel-question-card.is-creating .demo-typing-surface {
+    min-height: 5rem;
+    max-height: 5rem;
+    font-size: 0.92rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    word-break: break-all;
   }
   .demo-reel-quiz-screen {
     gap: 0.45rem;
