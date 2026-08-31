@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { AnonymousQuizEditor, QuizDashboard } from "./QuizDashboard";
 import { PlayerJoin } from "./PlayerJoin";
-import { RichText } from "./RichText";
+import { hasRichFormatting, RichText } from "./RichText";
 import { navigateInternally, navigateTo, SiteHeader } from "./SiteHeader";
 import { loadAnonymousDraft } from "./quizzes";
 import "./styles.css";
@@ -655,7 +655,7 @@ function MathDemoReel({
                 return (
                   <div className="demo-reel-answer" key={answer}>
                     <b>{index + 1}</b>
-                    {mode === "code" && isComplete ? (
+                    {isComplete && hasRichFormatting(answer) ? (
                       <div className="demo-reel-answer-rich">
                         <RichText text={answer} />
                       </div>

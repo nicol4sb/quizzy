@@ -1147,6 +1147,13 @@ button:disabled {
   overflow-wrap: anywhere;
   white-space: normal;
 }
+.demo-reel-answer-rich .rich-math-display {
+  margin: 0;
+  overflow: visible;
+}
+.demo-reel-answer-rich .rich-math-display .katex-display {
+  margin: 0;
+}
 .demo-reel-answer-rich .rich-inline-code {
   color: #9df5c8;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
