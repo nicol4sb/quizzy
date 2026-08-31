@@ -132,7 +132,7 @@ describe("live session launch", () => {
     ).toBe(404);
   });
 
-  it("locks quiz editing and deletion until the lobby is cancelled", async () => {
+  it("allows queued edits but locks deletion until the lobby is cancelled", async () => {
     const cookie = await register("host@example.com");
     const quizId = await createQuiz(cookie);
     const sessionId = (
@@ -142,16 +142,15 @@ describe("live session launch", () => {
         headers: { cookie },
       })
     ).json().session.id;
-    expect(
-      (
-        await app.inject({
-          method: "PUT",
-          url: `/api/quizzes/${quizId}`,
-          headers: { cookie },
-          payload: { ...quizInput, title: "Blocked update" },
-        })
-      ).statusCode,
-    ).toBe(409);
+    const queuedUpdate = await app.inject({
+      method: "PUT",
+      url: `/api/quizzes/${quizId}`,
+      headers: { cookie },
+      payload: { ...quizInput, title: "Queued update" },
+    });
+    expect(queuedUpdate.statusCode).toBe(200);
+    expect(queuedUpdate.json().pending).toBe(true);
+    expect(queuedUpdate.json().quiz.title).toBe("Queued update");
     expect(
       (
         await app.inject({

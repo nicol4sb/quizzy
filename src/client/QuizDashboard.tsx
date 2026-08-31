@@ -1,21 +1,48 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { QuizEditor } from "./QuizEditor";
 import { HostLobby } from "./HostLobby";
+import { navigateTo, SiteHeader } from "./SiteHeader";
 import {
   draftFromApi,
   newQuiz,
+  clearAnonymousDraft,
+  loadAnonymousDraft,
   quizPayload,
+  saveAnonymousDraft,
   type ApiQuiz,
   type QuizDraft,
   type QuizSummary,
 } from "./quizzes";
 
 type Props = { email: string; onLogout: () => Promise<void> };
+
+function draftIsSavable(draft: QuizDraft): boolean {
+  if (!draft.title.trim()) return false;
+  const questions = draft.questions.filter(({ prompt }) => prompt.trim());
+  return (
+    questions.length > 0 &&
+    questions.every((question) => {
+      const answers = question.answers.filter(({ text }) => text.trim());
+      return (
+        answers.length >= 2 &&
+        answers.filter(({ correct }) => correct).length === 1 &&
+        Number.isInteger(question.points) &&
+        question.points >= 1 &&
+        Number.isInteger(question.timeLimitSeconds) &&
+        question.timeLimitSeconds >= 5
+      );
+    })
+  );
+}
+
 export function QuizDashboard({ email, onLogout }: Props) {
   const [quizzes, setQuizzes] = useState<QuizSummary[]>([]);
   const [editing, setEditing] = useState<QuizDraft>();
+  const [importAnonymousDraft, setImportAnonymousDraft] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "queued"
+  >("idle");
   const [error, setError] = useState("");
   const initialSession = window.location.pathname.match(
     /^\/host\/([0-9a-f-]+)$/i,
@@ -33,6 +60,11 @@ export function QuizDashboard({ email, onLogout }: Props) {
   }
   useEffect(() => {
     void loadQuizzes();
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      const draft = loadAnonymousDraft();
+      setEditing(draft ?? newQuiz());
+      setImportAnonymousDraft(Boolean(draft));
+    }
   }, []);
   async function editQuiz(id: string) {
     setError("");
@@ -42,34 +74,105 @@ export function QuizDashboard({ email, onLogout }: Props) {
       draftFromApi(((await response.json()) as { quiz: ApiQuiz }).quiz),
     );
   }
-  async function saveQuiz() {
-    if (!editing) return;
-    setSaving(true);
-    setError("");
-    const response = await fetch(
-      editing.id ? `/api/quizzes/${editing.id}` : "/api/quizzes",
-      {
-        method: editing.id ? "PUT" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(quizPayload(editing)),
-      },
-    );
-    const body = (await response.json()) as { quiz?: ApiQuiz; error?: string };
-    if (response.ok && body.quiz) {
-      setEditing(undefined);
-      await loadQuizzes();
-    } else setError(body.error ?? "Could not save the quiz.");
-    setSaving(false);
-  }
+  const saveQuiz = useCallback(
+    async (draftOverride?: QuizDraft, explicit = false) => {
+      const draft = draftOverride ?? editing;
+      if (!draft) return;
+      // Autosave should not surface validation errors while a creator is still
+      // filling in a new question. Keep the partial draft local until it is
+      // complete; an explicit form submission gives actionable guidance.
+      if (!draftIsSavable(draft) && !explicit) return;
+      if (!draftIsSavable(draft) && explicit) {
+        setError(
+          "Add at least two answers to every question and choose exactly one correct answer before saving.",
+        );
+        setSaveState("idle");
+        return;
+      }
+      setSaveState("saving");
+      setError("");
+      const response = await fetch(
+        draft.id ? `/api/quizzes/${draft.id}` : "/api/quizzes",
+        {
+          method: draft.id ? "PUT" : "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(quizPayload(draft)),
+        },
+      );
+      const body = (await response.json()) as {
+        quiz?: ApiQuiz;
+        error?: string;
+        pending?: boolean;
+      };
+      if (response.ok && body.quiz) {
+        // Preserve the active editor tree/caret after a blur save. The server
+        // response is authoritative for the id, while the local draft already
+        // contains the edits that were just submitted.
+        setEditing({ ...draft, id: body.quiz.id });
+        if (!draft.id) clearAnonymousDraft();
+        setSaveState(body.pending ? "queued" : "saved");
+        await loadQuizzes();
+      } else {
+        setSaveState("idle");
+        setError(body.error ?? "Could not save the quiz.");
+      }
+    },
+    [editing],
+  );
+  useEffect(() => {
+    if (!importAnonymousDraft || !editing) return;
+    setImportAnonymousDraft(false);
+    void saveQuiz(editing);
+  }, [editing, importAnonymousDraft, saveQuiz]);
   async function deleteQuiz(id: string) {
     if (!window.confirm("Delete this quiz permanently?")) return;
     setError("");
+    setSaveState("idle");
     const response = await fetch(`/api/quizzes/${id}`, { method: "DELETE" });
-    if (response.ok) await loadQuizzes();
-    else {
+    if (response.ok) {
+      setEditing(undefined);
+      await loadQuizzes();
+    } else {
       const body = (await response.json()) as { error?: string };
       setError(body.error ?? "Could not delete that quiz.");
     }
+  }
+  async function togglePublic(id: string, isPublic: boolean) {
+    const update = await fetch(`/api/quizzes/${id}/visibility`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ isPublic }),
+    });
+    if (!update.ok) {
+      const body = (await update.json()) as { error?: string };
+      return setError(body.error ?? "Could not update quiz visibility.");
+    }
+    // Updating visibility should not reload/re-sort the whole dashboard. The
+    // list is ordered by updated_at, so a full refresh makes the clicked card
+    // jump to another position and can look like a different quiz flashed.
+    // Patch only the card that was acted on, preserving its position.
+    const body = (await update.json()) as { isPublic?: boolean };
+    setQuizzes((items) =>
+      items.map((item) =>
+        item.id === id
+          ? { ...item, isPublic: body.isPublic ?? isPublic }
+          : item,
+      ),
+    );
+  }
+  async function renameQuiz(id: string, title: string) {
+    const response = await fetch(`/api/quizzes/${id}`);
+    if (!response.ok) return setError("Could not load that quiz.");
+    const draft = draftFromApi(
+      ((await response.json()) as { quiz: ApiQuiz }).quiz,
+    );
+    const update = await fetch(`/api/quizzes/${id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(quizPayload({ ...draft, title })),
+    });
+    if (!update.ok) return setError("Could not save the quiz title.");
+    await loadQuizzes();
   }
   async function launchQuiz(id: string) {
     setError("");
@@ -82,11 +185,11 @@ export function QuizDashboard({ email, onLogout }: Props) {
     };
     if (!response.ok || !body.session)
       return setError(body.error ?? "Could not launch the quiz.");
-    window.history.pushState({}, "", `/host/${body.session.id}`);
+    navigateTo(`/host/${body.session.id}`, { notify: false });
     setHostSessionId(body.session.id);
   }
   function closeLobby() {
-    window.history.pushState({}, "", "/");
+    navigateTo("/dashboard", { replace: true, notify: false });
     setHostSessionId(undefined);
     void loadQuizzes();
   }
@@ -95,34 +198,48 @@ export function QuizDashboard({ email, onLogout }: Props) {
   if (editing)
     return (
       <main className="app-shell">
+        <SiteHeader
+          active="create"
+          loggedIn
+          email={email}
+          onLogout={onLogout}
+          onCreate={() => setEditing(newQuiz())}
+          onMyQuizzes={() => {
+            setEditing(undefined);
+            setError("");
+          }}
+        />
         <QuizEditor
           quiz={editing}
-          saving={saving}
           error={error}
-          onChange={setEditing}
+          onChange={(next) => {
+            setEditing(next);
+            setSaveState("idle");
+          }}
           onCancel={() => {
             setEditing(undefined);
             setError("");
           }}
+          onDelete={() => deleteQuiz(editing.id!)}
           onSave={saveQuiz}
+          saveState={saveState}
         />
       </main>
     );
   return (
     <main className="app-shell">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">Creator dashboard</p>
-          <h1>Your quizzes</h1>
-          <p>Signed in as {email}</p>
-        </div>
-        <div className="header-actions">
-          <button onClick={() => setEditing(newQuiz())}>Create quiz</button>
-          <button className="secondary" onClick={() => void onLogout()}>
-            Log out
-          </button>
-        </div>
-      </header>
+      <SiteHeader
+        active="quizzes"
+        loggedIn
+        email={email}
+        onLogout={onLogout}
+        onCreate={() => setEditing(newQuiz())}
+      />
+      <div className="dashboard-meta">
+        <p className="dashboard-visibility-help">
+          Private quizzes are playable only after you start a live session.
+        </p>
+      </div>
       {error && (
         <p className="error" role="alert">
           {error}
@@ -141,51 +258,157 @@ export function QuizDashboard({ email, onLogout }: Props) {
       ) : (
         <section className="quiz-grid">
           {quizzes.map((quiz) => (
-            <article className="quiz-tile" key={quiz.id}>
-              <p className="theme-label">{quiz.theme.replace("-", " ")}</p>
-              <h2>{quiz.title}</h2>
+            <article className={`quiz-tile theme-${quiz.theme}`} key={quiz.id}>
+              <button
+                type="button"
+                className="tile-delete danger-icon"
+                title="Delete quiz"
+                aria-label="Delete quiz"
+                disabled={Boolean(quiz.activeSessionId)}
+                onClick={() => void deleteQuiz(quiz.id)}
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+              <input
+                className="tile-title"
+                aria-label={`Quiz title: ${quiz.title}`}
+                value={quiz.title}
+                maxLength={72}
+                onChange={(event) =>
+                  setQuizzes((items) =>
+                    items.map((item) =>
+                      item.id === quiz.id
+                        ? { ...item, title: event.target.value }
+                        : item,
+                    ),
+                  )
+                }
+                onBlur={(event) => {
+                  const title = event.currentTarget.value.trim();
+                  if (title) void renameQuiz(quiz.id, title);
+                }}
+              />
               <p>
                 {quiz.questionCount}{" "}
                 {quiz.questionCount === 1 ? "question" : "questions"}
               </p>
+              <button
+                type="button"
+                className={`visibility-badge${quiz.isPublic ? " is-public" : ""}`}
+                title={
+                  quiz.isPublic
+                    ? "Public quiz: anyone with its link can play"
+                    : "Private quiz: players can join only after you start it"
+                }
+                aria-label={
+                  quiz.isPublic ? "Make quiz private" : "Make quiz public"
+                }
+                disabled={Boolean(quiz.activeSessionId)}
+                onClick={() => void togglePublic(quiz.id, !quiz.isPublic)}
+              >
+                {quiz.isPublic ? "Public" : "Private"}
+              </button>
               <div className="tile-actions">
                 {quiz.activeSessionId ? (
                   <button
+                    className="tile-action-button tile-action-primary"
                     onClick={() => {
-                      window.history.pushState(
-                        {},
-                        "",
-                        `/host/${quiz.activeSessionId}`,
-                      );
+                      navigateTo(`/host/${quiz.activeSessionId}`, {
+                        notify: false,
+                      });
                       setHostSessionId(quiz.activeSessionId!);
                     }}
                   >
                     Open lobby
                   </button>
                 ) : (
-                  <button onClick={() => void launchQuiz(quiz.id)}>
+                  <button
+                    className="tile-action-button tile-action-primary"
+                    onClick={() => void launchQuiz(quiz.id)}
+                  >
                     Launch
                   </button>
                 )}
                 <button
-                  className="secondary"
-                  disabled={Boolean(quiz.activeSessionId)}
+                  className="tile-action-button tile-action-secondary"
+                  title={
+                    quiz.activeSessionId
+                      ? "Edit safely; changes apply after the active session"
+                      : "Edit quiz"
+                  }
                   onClick={() => void editQuiz(quiz.id)}
                 >
                   Edit
-                </button>
-                <button
-                  className="danger"
-                  disabled={Boolean(quiz.activeSessionId)}
-                  onClick={() => void deleteQuiz(quiz.id)}
-                >
-                  Delete
                 </button>
               </div>
             </article>
           ))}
         </section>
       )}
+    </main>
+  );
+}
+
+export function AnonymousQuizEditor({
+  onLogin,
+  onCancel,
+}: {
+  onLogin: (register: boolean) => void;
+  onCancel: () => void;
+}) {
+  const [quiz, setQuiz] = useState<QuizDraft>(() => {
+    return loadAnonymousDraft() ?? newQuiz();
+  });
+  const [error, setError] = useState("");
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "queued" | "local"
+  >("local");
+
+  function updateDraft(next: QuizDraft) {
+    setQuiz(next);
+    saveAnonymousDraft(next);
+    setSaveState("local");
+    setError("");
+  }
+
+  async function saveDraft(draftOverride?: QuizDraft, explicit = false) {
+    const draft = draftOverride ?? quiz;
+    saveAnonymousDraft(draft);
+    if (!explicit) {
+      setSaveState("local");
+      return;
+    }
+    if (!draftIsSavable(draft)) {
+      setError(
+        "Add at least two answers to every question and choose exactly one correct answer before saving.",
+      );
+      setSaveState("idle");
+      return;
+    }
+    setError("");
+    setSaveState("saved");
+    onLogin(true);
+  }
+
+  return (
+    <main className="app-shell">
+      <SiteHeader active="create" loggedIn={false} onLogin={onLogin} />
+      <p className="anonymous-editor-hint">
+        Your draft is saved on this device. Sign in only when you’re ready to
+        save it to your account.
+      </p>
+      <QuizEditor
+        quiz={quiz}
+        error={error}
+        onChange={updateDraft}
+        onCancel={() => {
+          clearAnonymousDraft();
+          onCancel();
+        }}
+        onSave={saveDraft}
+        saveState={saveState}
+        saveLabel="Save quiz"
+      />
     </main>
   );
 }

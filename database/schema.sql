@@ -24,11 +24,18 @@ CREATE TABLE IF NOT EXISTS quizzes (
   creator_id uuid NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
   title text NOT NULL,
   theme text NOT NULL DEFAULT 'game-show',
+  is_public boolean NOT NULL DEFAULT false,
+  play_count integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT quizzes_title_length CHECK (char_length(title) BETWEEN 1 AND 72),
+  CONSTRAINT quizzes_play_count_valid CHECK (play_count >= 0),
   CONSTRAINT quizzes_theme_valid CHECK (theme IN ('game-show', 'classroom', 'neon-arcade', 'minimal'))
 );
+
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_public boolean NOT NULL DEFAULT false;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS play_count integer NOT NULL DEFAULT 0;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS pending_payload jsonb;
 
 CREATE INDEX IF NOT EXISTS quizzes_creator_updated_idx ON quizzes(creator_id, updated_at DESC);
 

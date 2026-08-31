@@ -69,7 +69,7 @@ export async function registerSessionRoutes(app, database) {
         try {
             await client.query("BEGIN");
             const quiz = await client.query(`SELECT q.id FROM quizzes q
-          WHERE q.id = $1 AND q.creator_id = $2
+          WHERE q.id = $1 AND (q.creator_id = $2 OR q.is_public = true)
             AND EXISTS (SELECT 1 FROM questions qu WHERE qu.quiz_id = q.id)
           FOR UPDATE`, [parsedId.data, hostCreatorId]);
             if (!quiz.rowCount) {
@@ -99,6 +99,7 @@ export async function registerSessionRoutes(app, database) {
             }
             if (!created)
                 throw new Error("Could not allocate a unique join code");
+            await client.query("UPDATE quizzes SET play_count = play_count + 1 WHERE id = $1 AND is_public = true", [parsedId.data]);
             await client.query("COMMIT");
             return reply.code(201).send({ session: publicSession(created) });
         }

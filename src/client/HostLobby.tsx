@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type AnswerProgress,
   type LeaderboardEntry,
@@ -9,6 +9,7 @@ import {
 } from "./live";
 import { Podium, ResultsView } from "./ResultsView";
 import { RichText } from "./RichText";
+import { navigateTo } from "./SiteHeader";
 
 type Session = {
   id: string;
@@ -34,13 +35,15 @@ export function HostLobby({ sessionId, onClose }: Props) {
   const [qrCode, setQrCode] = useState("");
   const [joinOrigin, setJoinOrigin] = useState(window.location.origin);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [joinedPlayer, setJoinedPlayer] = useState<{
-    player: Player;
-    sequence: number;
-  }>();
+  const [joinCelebrations, setJoinCelebrations] = useState<
+    {
+      player: Player;
+      sequence: number;
+    }[]
+  >([]);
   const knownPlayerIds = useRef(new Set<string>());
   const joinSequence = useRef(0);
-  const celebrationTimer = useRef<number | undefined>(undefined);
+  const celebrationTimers = useRef(new Map<number, number>());
   const [question, setQuestion] = useState<LiveQuestion>();
   const [progress, setProgress] = useState<AnswerProgress>({
     answeredCount: 0,
@@ -48,6 +51,7 @@ export function HostLobby({ sessionId, onClose }: Props) {
   });
   const [starting, setStarting] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [results, setResults] = useState<LiveResults>();
   const [finalLeaderboard, setFinalLeaderboard] =
     useState<LeaderboardEntry[]>();
@@ -132,15 +136,17 @@ export function HostLobby({ sessionId, onClose }: Props) {
         );
         if (newPlayer) {
           joinSequence.current += 1;
-          setJoinedPlayer({
-            player: newPlayer,
-            sequence: joinSequence.current,
-          });
-          window.clearTimeout(celebrationTimer.current);
-          celebrationTimer.current = window.setTimeout(
-            () => setJoinedPlayer(undefined),
-            2200,
+          const sequence = joinSequence.current;
+          setJoinCelebrations((current) =>
+            [{ player: newPlayer, sequence }, ...current].slice(0, 4),
           );
+          const timer = window.setTimeout(() => {
+            setJoinCelebrations((current) =>
+              current.filter((item) => item.sequence !== sequence),
+            );
+            celebrationTimers.current.delete(sequence);
+          }, 8000);
+          celebrationTimers.current.set(sequence, timer);
         }
         setPlayers(payload.players);
         setProgress((current) => ({
@@ -203,23 +209,50 @@ export function HostLobby({ sessionId, onClose }: Props) {
     });
     return () => {
       socket.close();
-      window.clearTimeout(celebrationTimer.current);
+      for (const timer of celebrationTimers.current.values())
+        window.clearTimeout(timer);
+      celebrationTimers.current.clear();
     };
   }, [sessionId]);
 
-  async function cancel() {
-    if (
-      !window.confirm(
-        "Cancel this quiz for everyone? This live run and its answers will be discarded.",
-      )
-    )
-      return;
+  const cancel = useCallback(async () => {
+    setCancelling(true);
     const response = await fetch(`/api/sessions/${sessionId}`, {
       method: "DELETE",
     });
     if (response.ok) onClose();
-    else setError("The quiz could not be cancelled.");
-  }
+    else {
+      setCancelling(false);
+      setError("The quiz could not be cancelled.");
+    }
+  }, [onClose, sessionId]);
+
+  useEffect(() => {
+    function leave() {
+      if (!session) return;
+      if (finalLeaderboard || session.state === "FINISHED") {
+        onClose();
+        return;
+      }
+      void cancel();
+    }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && !cancelling) {
+        event.preventDefault();
+        leave();
+      }
+    }
+    function handleBack() {
+      navigateTo(`/host/${sessionId}`, { replace: true, notify: false });
+      if (!cancelling) leave();
+    }
+    document.addEventListener("keydown", handleEscape);
+    window.addEventListener("popstate", handleBack);
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("popstate", handleBack);
+    };
+  }, [cancel, cancelling, finalLeaderboard, onClose, session, sessionId]);
 
   async function start() {
     if (!session) return;
@@ -350,8 +383,12 @@ export function HostLobby({ sessionId, onClose }: Props) {
                 {transitioning ? "Finishing…" : "Finish quiz"}
               </button>
             )}
-            <button className="danger" onClick={() => void cancel()}>
-              Cancel quiz
+            <button
+              className="secondary"
+              disabled={cancelling}
+              onClick={() => void cancel()}
+            >
+              {cancelling ? "Ending…" : "← Back to dashboard"}
             </button>
           </div>
         }
@@ -458,23 +495,31 @@ export function HostLobby({ sessionId, onClose }: Props) {
           >
             {transitioning ? "Revealing…" : "Show results"}
           </button>
-          <button className="danger cancel-live" onClick={() => void cancel()}>
-            Cancel quiz
+          <button
+            className="secondary"
+            disabled={cancelling}
+            onClick={() => void cancel()}
+          >
+            {cancelling ? "Ending…" : "← Back to dashboard"}
           </button>
         </div>
       </main>
     );
   return (
     <main className={`lobby-shell theme-${session.quizTheme}`}>
-      {joinedPlayer && (
-        <div
-          className="join-celebration"
-          key={joinedPlayer.sequence}
-          role="status"
-        >
-          <span aria-hidden="true">{joinSymbols[session.quizTheme]}</span>
-          <strong>{joinedPlayer.player.nickname}</strong>
-          <small>joined the quiz!</small>
+      {joinCelebrations.length > 0 && (
+        <div className="join-celebrations" aria-live="polite">
+          {joinCelebrations.map((joined) => (
+            <div
+              className="join-celebration"
+              key={joined.sequence}
+              role="status"
+            >
+              <span aria-hidden="true">{joinSymbols[session.quizTheme]}</span>
+              <strong>{joined.player.nickname}</strong>
+              <small>joined the quiz!</small>
+            </div>
+          ))}
         </div>
       )}
       <section className="lobby-main">
@@ -512,11 +557,12 @@ export function HostLobby({ sessionId, onClose }: Props) {
         >
           {starting ? "Starting…" : "Start quiz"}
         </button>
-        <button className="danger" onClick={() => void cancel()}>
-          Cancel quiz
-        </button>
-        <button className="secondary" onClick={onClose}>
-          Back to dashboard
+        <button
+          className="secondary"
+          disabled={cancelling}
+          onClick={() => void cancel()}
+        >
+          {cancelling ? "Ending…" : "← Back to dashboard"}
         </button>
       </aside>
     </main>

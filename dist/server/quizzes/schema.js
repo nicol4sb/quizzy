@@ -32,6 +32,7 @@ export const quizInputSchema = z
     .object({
     title: z.string().trim().min(1).max(72),
     theme: z.enum(themes),
+    isPublic: z.boolean().default(false),
     questions: z.array(questionSchema).min(1).max(100),
 })
     .strict();
@@ -58,6 +59,7 @@ export const legacyQuizInputSchema = z
     .object({
     title: z.string().trim().min(1).max(120),
     theme: z.enum(themes),
+    isPublic: z.boolean().default(false),
     questions: z.array(legacyQuestionSchema).min(1).max(100),
 })
     .strict();
