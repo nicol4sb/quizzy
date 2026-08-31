@@ -16,6 +16,8 @@ type PublicQuiz = {
   creator: string;
   playCount: number;
   questionCount: number;
+  rank?: number;
+  isMine?: boolean;
 };
 type PublicQuizDetail = PublicQuiz & {
   questions: {
@@ -27,8 +29,6 @@ type PublicQuizDetail = PublicQuiz & {
   }[];
 };
 
-type DemoMode = "math" | "code";
-
 function creatorDisplayName(email: string): string {
   const localPart = email.split("@", 1)[0] ?? email;
   return localPart
@@ -38,24 +38,14 @@ function creatorDisplayName(email: string): string {
     .join(" ");
 }
 
-const demoSequences: Record<
-  DemoMode,
-  { question: string; source: string; answers: string[] }
-> = {
-  math: {
-    question: "Which function does this series evaluate?",
-    source: "$$\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}$$",
-    answers: [
-      "Riemann zeta, $$\\zeta(2)$$",
-      "The Gamma function, $$\\Gamma(2)$$",
-      "A Fourier series coefficient",
-    ],
-  },
-  code: {
-    question: "What does this JavaScript return?",
-    source: "```js [1, 2, 3].filter(n => n > 1)```",
-    answers: ["```js [2, 3]```", "```js [1, 2, 3]```", "```js [1]```"],
-  },
+const demoSequence = {
+  question: "Which function does this series evaluate?",
+  source: "$$\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}$$",
+  answers: [
+    "Riemann zeta, $$\\zeta(2)$$",
+    "The Gamma function, $$\\Gamma(2)$$",
+    "A Fourier series coefficient",
+  ],
 };
 const demoSlideStages = [0, 5, 6];
 const studentAnswerOrder = [0, 4, 7, 2, 5, 1, 6, 3];
@@ -116,12 +106,14 @@ function MostPlayedPage({
   email,
   onLogout,
   onLogin,
+  myPublicQuizzes,
 }: {
   quizzes: PublicQuiz[];
   loggedIn: boolean;
   email?: string;
   onLogout?: () => Promise<void>;
   onLogin?: (register: boolean) => void;
+  myPublicQuizzes: PublicQuiz[];
 }) {
   const [classError, setClassError] = useState("");
   async function launchClassQuiz(quizId: string) {
@@ -168,6 +160,7 @@ function MostPlayedPage({
         <PublicQuizList
           quizzes={quizzes}
           limit={6}
+          myPublicQuizzes={myPublicQuizzes}
           loggedIn={loggedIn}
           onClassPlay={(quizId) => void launchClassQuiz(quizId)}
         />
@@ -425,8 +418,7 @@ function MathDemoReel({
   loggedIn: boolean;
   showNavigation: boolean;
 }) {
-  const [mode, setMode] = useState<DemoMode>("code");
-  const sequence = demoSequences[mode];
+  const sequence = demoSequence;
   const fullText = sequence.question + " " + sequence.source;
   const [stage, setStage] = useState(0);
   const [runId, setRunId] = useState(0);
@@ -485,7 +477,6 @@ function MathDemoReel({
         setAnswerTypedLength(0);
         setResponses(0);
         setShowResultsCta(false);
-        setMode((current) => (current === "math" ? "code" : "math"));
         setStage(0);
       }, 18000);
       ctaTimer = window.setTimeout(() => setShowResultsCta(true), 3000);
@@ -546,77 +537,87 @@ function MathDemoReel({
     >
       <section
         className="demo-reel-screen demo-reel-quiz-screen"
-        key={`quiz-${mode}`}
+        key="quiz-math"
       >
         {stage === 5 ? (
-          <div className="demo-classroom-scene">
-            <div
-              className="demo-projector"
-              aria-label="Projected quiz question"
-            >
-              <div className="demo-projector-wall">
-                <div className="demo-projector-screen">
-                  <div className="demo-projector-question">
-                    <p>{sequence.question}</p>
-                    <RichText text={sequence.source} />
-                  </div>
-                  <div className="demo-projector-answers">
-                    {sequence.answers.map((answer, index) => (
-                      <div key={answer}>
-                        <b>{index + 1}</b>
-                        <RichText text={answer} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="demo-projector-stand" aria-hidden="true" />
-              </div>
-            </div>
-            <div className="demo-student-area" aria-label="Classroom responses">
-              <div className="demo-students" aria-label="Students answering">
-                {Array.from({ length: 8 }, (_, index) => {
-                  const hasAnswered =
-                    answeredCount >= studentAnswerOrder.indexOf(index) + 1;
-                  return (
-                    <div
-                      className={`demo-student${hasAnswered ? " is-answered" : ""}`}
-                      aria-label={`Student ${index + 1}${hasAnswered ? ` answered option ${studentAnswers[index]}` : " is thinking"}`}
-                      key={index}
-                    >
-                      <span className="demo-student-ascii" aria-hidden="true">
-                        {studentFigures[index].join("\n")}
-                      </span>
-                      <span className="demo-student-phone" aria-hidden="true">
-                        {hasAnswered ? studentAnswers[index] : "▯"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div
-              className="demo-classroom-progress"
-              aria-label={`${answeredCount} of 8 responses received`}
-            >
+          <>
+            <div className="demo-classroom-scene">
+              <small className="demo-reel-stage-label demo-reel-play-label">
+                2 · Play
+              </small>
               <div
-                className="demo-classroom-progress-track"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={8}
-                aria-valuenow={answeredCount}
+                className="demo-projector"
+                aria-label="Projected quiz question"
               >
-                <span style={{ width: `${(answeredCount / 8) * 100}%` }} />
+                <div className="demo-projector-wall">
+                  <div className="demo-projector-screen">
+                    <div className="demo-projector-question">
+                      <p>{sequence.question}</p>
+                      <RichText text={sequence.source} />
+                    </div>
+                    <div className="demo-projector-answers">
+                      {sequence.answers.map((answer, index) => (
+                        <div key={answer}>
+                          <b>{index + 1}</b>
+                          <RichText text={answer} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="demo-projector-stand" aria-hidden="true" />
+                </div>
+              </div>
+              <div
+                className="demo-student-area"
+                aria-label="Classroom responses"
+              >
+                <div className="demo-students" aria-label="Students answering">
+                  {Array.from({ length: 8 }, (_, index) => {
+                    const hasAnswered =
+                      answeredCount >= studentAnswerOrder.indexOf(index) + 1;
+                    return (
+                      <div
+                        className={`demo-student${hasAnswered ? " is-answered" : ""}`}
+                        aria-label={`Student ${index + 1}${hasAnswered ? ` answered option ${studentAnswers[index]}` : " is thinking"}`}
+                        key={index}
+                      >
+                        <span className="demo-student-ascii" aria-hidden="true">
+                          {studentFigures[index].join("\n")}
+                        </span>
+                        <span className="demo-student-phone" aria-hidden="true">
+                          {hasAnswered ? studentAnswers[index] : "▯"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div
+                className="demo-classroom-progress"
+                aria-label={`${answeredCount} of 8 responses received`}
+              >
+                <div
+                  className="demo-classroom-progress-track"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={8}
+                  aria-valuenow={answeredCount}
+                >
+                  <span style={{ width: `${(answeredCount / 8) * 100}%` }} />
+                </div>
               </div>
             </div>
-          </div>
+          </>
         ) : (
           <>
+            <small className="demo-reel-stage-label">
+              1 · Create your quiz
+            </small>
             <div
               className={`demo-reel-question-card${stage === 0 ? " is-creating" : ""}`}
             >
               {stage === 0 ? (
                 <>
-                  <small>Create a quiz · JavaScript</small>
                   <div className="demo-typing-surface" aria-live="polite">
                     <span>{typed}</span>
                     <span className="demo-caret" aria-hidden="true" />
@@ -672,6 +673,7 @@ function MathDemoReel({
       </section>
 
       <section className="demo-reel-screen demo-reel-results-screen">
+        <small className="demo-reel-stage-label">3 · Engage</small>
         <div className="demo-fireworks" aria-hidden="true">
           <span className="demo-firework demo-firework-left" />
           <span className="demo-firework demo-firework-right" />
@@ -755,21 +757,54 @@ function PublicQuizList({
   quizzes,
   limit = 6,
   loggedIn = false,
+  myPublicQuizzes = [],
   onClassPlay,
 }: {
   quizzes: PublicQuiz[];
   limit?: number;
   loggedIn?: boolean;
+  myPublicQuizzes?: PublicQuiz[];
   onClassPlay?: (quizId: string) => void;
 }) {
+  const [copiedQuizId, setCopiedQuizId] = useState<string>();
+  const ownQuizById = new Map(
+    myPublicQuizzes.map((quiz) => [quiz.id, quiz] as const),
+  );
   const rankedQuizzes = [...quizzes]
     .sort((first, second) => second.playCount - first.playCount)
-    .slice(0, limit);
-  return rankedQuizzes.length ? (
+    .slice(0, limit)
+    .map((quiz) => {
+      const ownQuiz = ownQuizById.get(quiz.id);
+      return ownQuiz
+        ? { ...quiz, isMine: true, rank: ownQuiz.rank ?? quiz.rank }
+        : quiz;
+    });
+  const visibleIds = new Set(rankedQuizzes.map((quiz) => quiz.id));
+  const ownQuizzesOutsideRanking = myPublicQuizzes
+    .filter((quiz) => !visibleIds.has(quiz.id))
+    .slice(0, 3)
+    .map((quiz) => ({ ...quiz, isMine: true }));
+  const displayQuizzes = [...rankedQuizzes, ...ownQuizzesOutsideRanking];
+  async function copyQuizLink(quizId: string) {
+    try {
+      await navigator.clipboard.writeText(
+        new URL(`/play/${quizId}`, window.location.origin).toString(),
+      );
+      setCopiedQuizId(quizId);
+      window.setTimeout(() => {
+        setCopiedQuizId((current) =>
+          current === quizId ? undefined : current,
+        );
+      }, 2200);
+    } catch {
+      setCopiedQuizId(undefined);
+    }
+  }
+  return displayQuizzes.length ? (
     <div className="public-activity-list">
-      {rankedQuizzes.map((quiz, index) => (
+      {displayQuizzes.map((quiz, index) => (
         <article
-          className="public-activity-card"
+          className={`public-activity-card${quiz.isMine ? " is-mine" : ""}`}
           key={quiz.id}
           role="link"
           tabIndex={0}
@@ -781,15 +816,22 @@ function PublicQuizList({
           }}
           aria-label={`Play ${quiz.title} solo`}
         >
-          <span className="public-ranking" aria-label={`Rank ${index + 1}`}>
-            <span className="public-ranking-number">{index + 1}</span>
+          <span
+            className="public-ranking"
+            aria-label={`Rank ${quiz.rank ?? index + 1}`}
+          >
+            <span className="public-ranking-number">
+              {quiz.rank ?? index + 1}
+            </span>
             <small>Rank</small>
           </span>
           <span className="public-activity-card-main">
             <strong>{quiz.title}</strong>
             <small>
-              by {creatorDisplayName(quiz.creator)} · {quiz.questionCount}{" "}
-              questions
+              {quiz.isMine
+                ? "Your public quiz"
+                : `by ${creatorDisplayName(quiz.creator)}`}{" "}
+              · {quiz.questionCount} questions
             </small>
           </span>
           <span
@@ -800,6 +842,28 @@ function PublicQuizList({
             <small>plays</small>
           </span>
           <span className="public-activity-card-actions">
+            <button
+              type="button"
+              className="public-activity-card-action public-activity-card-share"
+              aria-label={
+                copiedQuizId === quiz.id ? "Quiz link copied" : "Copy quiz link"
+              }
+              title={
+                copiedQuizId === quiz.id
+                  ? "Quiz link copied"
+                  : "Copy a link to this quiz"
+              }
+              onClick={(event) => {
+                event.stopPropagation();
+                void copyQuizLink(quiz.id);
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              <span aria-hidden="true">
+                {copiedQuizId === quiz.id ? "✓" : "⧉"}
+              </span>
+              {copiedQuizId === quiz.id ? "Copied" : "Copy link"}
+            </button>
             <button
               type="button"
               className="public-activity-card-action public-activity-card-class"
@@ -842,6 +906,7 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [publicQuizzes, setPublicQuizzes] = useState<PublicQuiz[]>([]);
+  const [myPublicQuizzes, setMyPublicQuizzes] = useState<PublicQuiz[]>([]);
 
   useEffect(() => {
     void fetch("/api/auth/me")
@@ -855,12 +920,22 @@ function App() {
   }, []);
   useEffect(() => {
     void fetch("/api/public/quizzes")
-      .then((response) => (response.ok ? response.json() : { quizzes: [] }))
-      .then((body: { quizzes: PublicQuiz[] }) => {
-        setPublicQuizzes(body.quizzes);
-      })
+      .then((response) =>
+        response.ok ? response.json() : { quizzes: [], myPublicQuizzes: [] },
+      )
+      .then(
+        (body: { quizzes: PublicQuiz[]; myPublicQuizzes?: PublicQuiz[] }) => {
+          setPublicQuizzes(body.quizzes);
+          setMyPublicQuizzes(
+            (body.myPublicQuizzes ?? []).map((quiz) => ({
+              ...quiz,
+              isMine: true,
+            })),
+          );
+        },
+      )
       .catch(() => undefined);
-  }, []);
+  }, [creator?.id]);
   useEffect(() => {
     function syncRoute() {
       setPathname(window.location.pathname);
@@ -965,6 +1040,7 @@ function App() {
     return (
       <MostPlayedPage
         quizzes={publicQuizzes}
+        myPublicQuizzes={myPublicQuizzes}
         loggedIn={Boolean(creator)}
         email={creator?.email}
         onLogout={logout}

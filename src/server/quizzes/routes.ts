@@ -207,7 +207,7 @@ export async function registerQuizRoutes(
   app: FastifyInstance,
   database: Database,
 ): Promise<void> {
-  app.get("/api/public/quizzes", async () => {
+  app.get("/api/public/quizzes", async (request) => {
     const mostPlayed = await database.query(
       `SELECT q.id, q.title, q.theme, q.play_count AS "playCount",
               c.email AS creator,
@@ -232,7 +232,33 @@ export async function registerQuizRoutes(
         ORDER BY q.created_at DESC
         LIMIT 12`,
     );
-    return { quizzes: mostPlayed.rows, latestQuizzes: latest.rows };
+    const creatorId = await authenticatedCreatorId(request, database);
+    const myPublicQuizzes = creatorId
+      ? await database.query(
+          `SELECT q.id, q.title, q.theme, q.play_count AS "playCount",
+                  c.email AS creator,
+                  count(qu.id)::integer AS "questionCount",
+                  ((SELECT count(*)
+                      FROM quizzes ahead
+                     WHERE ahead.is_public = true
+                       AND (ahead.play_count > q.play_count
+                            OR (ahead.play_count = q.play_count
+                                AND ahead.updated_at > q.updated_at)))::integer + 1) AS rank
+             FROM quizzes q
+             JOIN creators c ON c.id = q.creator_id
+             LEFT JOIN questions qu ON qu.quiz_id = q.id
+            WHERE q.is_public = true AND q.creator_id = $1
+            GROUP BY q.id, c.email
+            ORDER BY q.play_count DESC, q.updated_at DESC
+            LIMIT 6`,
+          [creatorId],
+        )
+      : { rows: [] };
+    return {
+      quizzes: mostPlayed.rows,
+      latestQuizzes: latest.rows,
+      myPublicQuizzes: myPublicQuizzes.rows,
+    };
   });
 
   app.get("/api/public/quizzes/:id", async (request, reply) => {
