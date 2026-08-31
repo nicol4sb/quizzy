@@ -43,9 +43,13 @@ const demoSequences: Record<
   { question: string; source: string; answers: string[] }
 > = {
   math: {
-    question: "What is the name of this series?",
+    question: "Which function does this series evaluate?",
     source: "$$\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}$$",
-    answers: ["Riemann zeta function", "Fourier series", "Taylor series"],
+    answers: [
+      "Riemann zeta function, $$\\zeta(2)$$",
+      "The Gamma function, $$\\Gamma(2)$$",
+      "A Fourier series coefficient",
+    ],
   },
   code: {
     question: "What does this JavaScript return?",
