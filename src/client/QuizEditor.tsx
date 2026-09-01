@@ -6,7 +6,6 @@ type Props = {
   quiz: QuizDraft;
   error: string;
   onChange: (quiz: QuizDraft) => void;
-  onCancel: () => void;
   onDelete?: () => Promise<void>;
   onSave: (draft?: QuizDraft, explicit?: boolean) => Promise<void>;
   saveState: "idle" | "saving" | "saved" | "queued" | "local";
@@ -179,7 +178,6 @@ export function QuizEditor({
   quiz,
   error,
   onChange,
-  onCancel,
   onDelete,
   onSave,
   saveState,
@@ -224,21 +222,12 @@ export function QuizEditor({
     <form className="quiz-editor" onSubmit={(event) => void submit(event)}>
       <div className="quiz-settings">
         <div className="title-editor">
-          <button
-            type="button"
-            className="secondary editor-back-button"
-            title="Back to quizzes"
-            aria-label="Back to quizzes"
-            onClick={onCancel}
-          >
-            <span aria-hidden="true">←</span>
-          </button>
           <InlineEditable
             value={quiz.title}
             maxLength={72}
             ariaLabel="Quiz title"
             title="Click to edit quiz title"
-            placeholder="Untitled quiz"
+            placeholder="Quiz title"
             onChange={(title) => onChange({ ...quiz, title })}
             onBlur={saveOnBlur}
           />

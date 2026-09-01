@@ -216,10 +216,6 @@ export function QuizDashboard({ email, onLogout }: Props) {
             setEditing(next);
             setSaveState("idle");
           }}
-          onCancel={() => {
-            setEditing(undefined);
-            setError("");
-          }}
           onDelete={() => deleteQuiz(editing.id!)}
           onSave={saveQuiz}
           saveState={saveState}
@@ -351,10 +347,8 @@ export function QuizDashboard({ email, onLogout }: Props) {
 
 export function AnonymousQuizEditor({
   onLogin,
-  onCancel,
 }: {
   onLogin: (register: boolean) => void;
-  onCancel: () => void;
 }) {
   const [quiz, setQuiz] = useState<QuizDraft>(() => {
     return loadAnonymousDraft() ?? newQuiz();
@@ -394,17 +388,12 @@ export function AnonymousQuizEditor({
     <main className="app-shell">
       <SiteHeader active="create" loggedIn={false} onLogin={onLogin} />
       <p className="anonymous-editor-hint">
-        Your draft is saved on this device. Sign in only when you’re ready to
-        save it to your account.
+        Draft saved locally. Sign in to save it to your account.
       </p>
       <QuizEditor
         quiz={quiz}
         error={error}
         onChange={updateDraft}
-        onCancel={() => {
-          clearAnonymousDraft();
-          onCancel();
-        }}
         onSave={saveDraft}
         saveState={saveState}
         saveLabel="Save quiz"

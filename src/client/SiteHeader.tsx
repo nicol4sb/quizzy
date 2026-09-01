@@ -79,19 +79,15 @@ export function SiteHeader({
   }
   const navClass = (section: SiteSection) =>
     `dashboard-nav-link${active === section ? " is-active" : ""}`;
+  const headerTagline = tagline ?? (
+    <h1>
+      Questions that matter.
+      <br />
+      <span className="site-tagline-indent">Engaged audiences.</span>
+    </h1>
+  );
   return (
-    <header className={`dashboard-header${tagline ? " has-tagline" : ""}`}>
-      <div className="dashboard-heading">
-        <a
-          className={`dashboard-brand${active === "home" ? " is-active" : ""}`}
-          href="/"
-          onClick={(event) => navigateInternally(event, "/")}
-          aria-label="Quizzy home"
-          aria-current={active === "home" ? "page" : undefined}
-        >
-          Quizzy
-        </a>
-      </div>
+    <header className="dashboard-header has-tagline">
       <nav className="header-actions" aria-label="Quizzy navigation">
         <a
           className={navClass("play")}
@@ -151,9 +147,10 @@ export function SiteHeader({
           <button
             type="button"
             className={navClass("quizzes")}
+            title="Sign in to view your quizzes"
             onClick={() => onLogin?.(false)}
           >
-            Log in
+            My quizzes
           </button>
         )}
       </nav>
@@ -177,8 +174,17 @@ export function SiteHeader({
             </span>
           </button>
         )}
+        {!loggedIn && onLogin && (
+          <button
+            type="button"
+            className="secondary dashboard-account-button"
+            onClick={() => onLogin(false)}
+          >
+            Log in
+          </button>
+        )}
       </div>
-      {tagline && <div className="site-tagline">{tagline}</div>}
+      <div className="site-tagline">{headerTagline}</div>
     </header>
   );
 }

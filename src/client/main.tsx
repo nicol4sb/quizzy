@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { AnonymousQuizEditor, QuizDashboard } from "./QuizDashboard";
 import { PlayerJoin } from "./PlayerJoin";
-import { hasRichFormatting, RichText } from "./RichText";
+import { RichText } from "./RichText";
 import { navigateInternally, navigateTo, SiteHeader } from "./SiteHeader";
 import { loadAnonymousDraft } from "./quizzes";
 import "./styles.css";
@@ -42,8 +42,8 @@ const demoSequence = {
   question: "Which function does this series evaluate?",
   source: "$$\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}$$",
   answers: [
-    "Riemann zeta, $$\\zeta(2)$$",
-    "The Gamma function, $$\\Gamma(2)$$",
+    "Riemann zeta function",
+    "The Gamma function",
     "A Fourier series coefficient",
   ],
 };
@@ -84,11 +84,9 @@ function PublicActivity({
         onLogin={onLogin}
         tagline={
           <h1 id="landing-title">
-            Keep your classroom engaged.
+            Questions that matter.
             <br />
-            <span className="site-tagline-indent">
-              Make every question a moment.
-            </span>
+            <span className="site-tagline-indent">Engaged audiences.</span>
           </h1>
         }
       />
@@ -543,7 +541,7 @@ function MathDemoReel({
           <>
             <div className="demo-classroom-scene">
               <small className="demo-reel-stage-label demo-reel-play-label">
-                2 · Play
+                Play
               </small>
               <div
                 className="demo-projector"
@@ -610,9 +608,7 @@ function MathDemoReel({
           </>
         ) : (
           <>
-            <small className="demo-reel-stage-label">
-              1 · Create your quiz
-            </small>
+            <small className="demo-reel-stage-label">Create your quiz</small>
             <div
               className={`demo-reel-question-card${stage === 0 ? " is-creating" : ""}`}
             >
@@ -649,18 +645,7 @@ function MathDemoReel({
                 return (
                   <div className="demo-reel-answer" key={answer}>
                     <b>{index + 1}</b>
-                    {isComplete && hasRichFormatting(answer) ? (
-                      <div className="demo-reel-answer-rich">
-                        <RichText
-                          text={answer.replace(
-                            /\$\$([\s\S]*?)\$\$/g,
-                            "\\($1\\)",
-                          )}
-                        />
-                      </div>
-                    ) : (
-                      <span>{answerText}</span>
-                    )}
+                    <span>{answerText}</span>
                     {isActive && !isComplete && (
                       <i className="demo-caret" aria-hidden="true" />
                     )}
@@ -673,7 +658,7 @@ function MathDemoReel({
       </section>
 
       <section className="demo-reel-screen demo-reel-results-screen">
-        <small className="demo-reel-stage-label">3 · Engage</small>
+        <small className="demo-reel-stage-label">Engage</small>
         <div className="demo-fireworks" aria-hidden="true">
           <span className="demo-firework demo-firework-left" />
           <span className="demo-firework demo-firework-right" />
@@ -1058,12 +1043,7 @@ function App() {
     );
 
   if (anonymousCreatePath && !loginOpen)
-    return (
-      <AnonymousQuizEditor
-        onLogin={openLogin}
-        onCancel={() => navigateTo("/")}
-      />
-    );
+    return <AnonymousQuizEditor onLogin={openLogin} />;
 
   if (creator) {
     return <QuizDashboard email={creator.email} onLogout={logout} />;
