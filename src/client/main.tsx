@@ -1061,15 +1061,9 @@ function App() {
         onLogin={openLogin}
       />
     );
-  if (publicPath && !loginOpen)
+  if (publicPath && !loginOpen && !creator)
     return (
-      <PublicActivity
-        loggedIn={Boolean(creator)}
-        isAdmin={Boolean(creator?.isAdmin)}
-        email={creator?.email}
-        onLogout={logout}
-        onLogin={openLogin}
-      />
+      <PublicActivity loggedIn={false} onLogout={logout} onLogin={openLogin} />
     );
 
   if (anonymousCreatePath && !loginOpen)

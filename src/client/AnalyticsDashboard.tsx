@@ -112,37 +112,74 @@ export function AnalyticsDashboard({ email, onLogout }: Props) {
               </article>
             ))}
           </section>
-          <section className="analytics-grid">
-            <article className="analytics-panel analytics-traffic-panel">
-              <div className="analytics-panel-heading">
-                <h2>Traffic by day</h2>
-                <span>Page views</span>
+          <section className="analytics-panel analytics-activity-panel">
+            <div className="analytics-panel-heading">
+              <div>
+                <h2>Activity volume</h2>
+                <span>Traffic and product activity over time</span>
               </div>
-              {data.daily.length ? (
-                <div className="analytics-bars" aria-label="Daily page views">
-                  {data.daily.map((day) => {
+              <span>Last {data.days} days</span>
+            </div>
+            {data.daily.length ? (
+              <>
+                <div
+                  className="analytics-chart"
+                  aria-label="Activity volume by day"
+                >
+                  {(() => {
                     const peak = Math.max(
-                      ...data.daily.map((item) => item.visits),
+                      ...data.daily.map((item) =>
+                        Math.max(item.events, item.visits),
+                      ),
                       1,
                     );
-                    return (
-                      <div className="analytics-bar-item" key={day.day}>
-                        <span
-                          className="analytics-bar"
-                          style={{
-                            height: `${Math.max((day.visits / peak) * 100, 4)}%`,
-                          }}
-                          title={`${day.visits} page views on ${day.day}`}
-                        />
-                        <small>{day.day.slice(5)}</small>
-                      </div>
+                    const labelStep = Math.max(
+                      1,
+                      Math.ceil(data.daily.length / 7),
                     );
-                  })}
+                    return data.daily.map((day, index) => (
+                      <div
+                        className="analytics-chart-column"
+                        key={day.day}
+                        title={`${day.day}: ${day.events} events, ${day.visits} page views`}
+                      >
+                        <div className="analytics-chart-bars">
+                          <span
+                            className="analytics-chart-bar analytics-chart-bar-events"
+                            style={{
+                              height: `${Math.max((day.events / peak) * 100, 3)}%`,
+                            }}
+                          />
+                          <span
+                            className="analytics-chart-bar analytics-chart-bar-visits"
+                            style={{
+                              height: `${Math.max((day.visits / peak) * 100, 3)}%`,
+                            }}
+                          />
+                        </div>
+                        <small>
+                          {index % labelStep === 0 ? day.day.slice(5) : ""}
+                        </small>
+                      </div>
+                    ));
+                  })()}
                 </div>
-              ) : (
-                <p className="analytics-empty">No traffic recorded yet.</p>
-              )}
-            </article>
+                <div className="analytics-chart-legend" aria-hidden="true">
+                  <span>
+                    <i className="analytics-legend-swatch analytics-legend-events" />
+                    All activity
+                  </span>
+                  <span>
+                    <i className="analytics-legend-swatch analytics-legend-visits" />
+                    Page views
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="analytics-empty">No activity recorded yet.</p>
+            )}
+          </section>
+          <section className="analytics-grid">
             <article className="analytics-panel">
               <div className="analytics-panel-heading">
                 <h2>Popular paths</h2>
