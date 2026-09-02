@@ -9,6 +9,7 @@ import {
 } from "./live";
 import { Podium } from "./ResultsView";
 import { RichText } from "./RichText";
+import { trackAnalytics } from "./analytics";
 
 type Lobby = { joinCode: string; quizTitle: string };
 type JoinedPlayer = {
@@ -247,6 +248,10 @@ export function PlayerJoin({ code }: { code: string }) {
         JSON.stringify(body),
       );
       setJoined(body);
+      trackAnalytics("player_joined", {
+        liveSessionId: body.sessionId,
+        path: `/join/${code}`,
+      });
     } else setError(body.error ?? "Could not join this lobby.");
     setSubmitting(false);
   }
@@ -280,8 +285,14 @@ export function PlayerJoin({ code }: { code: string }) {
       accepted?: boolean;
       error?: string;
     };
-    if (response.ok && body.accepted) setAnswered(true);
-    else {
+    if (response.ok && body.accepted) {
+      setAnswered(true);
+      trackAnalytics("answer_submitted", {
+        liveSessionId: joined.sessionId,
+        path: `/join/${code}`,
+        metadata: { roundId: question.roundId },
+      });
+    } else {
       setSelectedAnswerId(undefined);
       setError(body.error ?? "Your answer could not be submitted.");
     }

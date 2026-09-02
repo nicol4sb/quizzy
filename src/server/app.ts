@@ -10,6 +10,7 @@ import { registerQuizRoutes } from "./quizzes/routes.js";
 import { registerRealtimeRoutes } from "./realtime/routes.js";
 import { registerSessionRoutes } from "./sessions/routes.js";
 import { registerRuntimeRoutes } from "./runtime/routes.js";
+import { registerAnalyticsRoutes } from "./analytics/routes.js";
 
 export type AppDependencies = {
   pool: Pick<Pool, "query" | "connect">;
@@ -40,6 +41,7 @@ export async function buildApp({
   });
   app.decorate("roomEventBus", eventBus);
   await registerAuthRoutes(app, pool, secureCookies);
+  await registerAnalyticsRoutes(app, pool);
   await registerQuizRoutes(app, pool);
   await registerSessionRoutes(app, pool);
   await registerRealtimeRoutes(app, pool);

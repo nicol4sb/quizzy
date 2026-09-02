@@ -37,6 +37,7 @@ function publicCreator(creator: Creator) {
   return {
     id: creator.id,
     email: creator.email,
+    isAdmin: creator.is_admin,
     createdAt: creator.created_at,
   };
 }
@@ -65,13 +66,14 @@ export async function registerAuthRoutes(
     try {
       await client.query("BEGIN");
       const result = await client.query<Creator>(
-        `INSERT INTO creators (id, email, password_hash)
-         VALUES ($1, $2, $3)
-         RETURNING id, email, created_at`,
+        `INSERT INTO creators (id, email, password_hash, is_admin)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, email, is_admin, created_at`,
         [
           randomUUID(),
           parsed.data.email,
           await hashPassword(parsed.data.password),
+          parsed.data.email === "nic@bcd.com",
         ],
       );
       const creator = result.rows[0];
@@ -99,7 +101,7 @@ export async function registerAuthRoutes(
         .code(400)
         .send({ error: "Enter a valid email and password." });
     const result = await database.query<CreatorWithPassword>(
-      "SELECT id, email, password_hash, created_at FROM creators WHERE email = $1",
+      "SELECT id, email, password_hash, is_admin, created_at FROM creators WHERE email = $1",
       [parsed.data.email],
     );
     const creator = result.rows[0];

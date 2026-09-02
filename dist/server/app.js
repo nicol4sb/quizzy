@@ -8,6 +8,7 @@ import { registerQuizRoutes } from "./quizzes/routes.js";
 import { registerRealtimeRoutes } from "./realtime/routes.js";
 import { registerSessionRoutes } from "./sessions/routes.js";
 import { registerRuntimeRoutes } from "./runtime/routes.js";
+import { registerAnalyticsRoutes } from "./analytics/routes.js";
 export async function buildApp({ pool, eventBus, logger = false, serveClient = false, secureCookies = false, }) {
     const app = Fastify({ logger });
     await app.register(fastifyCookie);
@@ -24,6 +25,7 @@ export async function buildApp({ pool, eventBus, logger = false, serveClient = f
     });
     app.decorate("roomEventBus", eventBus);
     await registerAuthRoutes(app, pool, secureCookies);
+    await registerAnalyticsRoutes(app, pool);
     await registerQuizRoutes(app, pool);
     await registerSessionRoutes(app, pool);
     await registerRealtimeRoutes(app, pool);

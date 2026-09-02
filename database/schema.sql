@@ -4,9 +4,13 @@ CREATE TABLE IF NOT EXISTS creators (
   id uuid PRIMARY KEY,
   email text NOT NULL UNIQUE,
   password_hash text NOT NULL,
+  is_admin boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT creators_email_normalized CHECK (email = lower(trim(email)))
 );
+
+ALTER TABLE creators ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false;
+UPDATE creators SET is_admin = true WHERE email = 'nic@bcd.com';
 
 CREATE TABLE IF NOT EXISTS creator_sessions (
   id uuid PRIMARY KEY,
@@ -140,3 +144,29 @@ CREATE TABLE IF NOT EXISTS answer_submissions (
 
 CREATE INDEX IF NOT EXISTS answer_submissions_round_received_idx
   ON answer_submissions(question_round_id, received_at);
+
+-- First-party product analytics. Visitor IDs are anonymous, browser-generated
+-- identifiers; no IP addresses or raw request headers are stored.
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id uuid PRIMARY KEY,
+  occurred_at timestamptz NOT NULL DEFAULT now(),
+  event_type text NOT NULL,
+  visitor_id text,
+  path text,
+  creator_id uuid REFERENCES creators(id) ON DELETE SET NULL,
+  quiz_id uuid REFERENCES quizzes(id) ON DELETE SET NULL,
+  live_session_id uuid REFERENCES live_sessions(id) ON DELETE SET NULL,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT analytics_events_type_length CHECK (char_length(event_type) BETWEEN 1 AND 64),
+  CONSTRAINT analytics_events_visitor_length CHECK (visitor_id IS NULL OR char_length(visitor_id) BETWEEN 1 AND 128),
+  CONSTRAINT analytics_events_path_length CHECK (path IS NULL OR char_length(path) BETWEEN 1 AND 512)
+);
+
+CREATE INDEX IF NOT EXISTS analytics_events_occurred_idx
+  ON analytics_events(occurred_at DESC);
+CREATE INDEX IF NOT EXISTS analytics_events_type_occurred_idx
+  ON analytics_events(event_type, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS analytics_events_path_occurred_idx
+  ON analytics_events(path, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS analytics_events_quiz_occurred_idx
+  ON analytics_events(quiz_id, occurred_at DESC);

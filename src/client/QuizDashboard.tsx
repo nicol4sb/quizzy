@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { QuizEditor } from "./QuizEditor";
 import { HostLobby } from "./HostLobby";
 import { navigateTo, SiteHeader } from "./SiteHeader";
+import { trackAnalytics } from "./analytics";
 import {
   draftFromApi,
   newQuiz,
@@ -14,7 +15,11 @@ import {
   type QuizSummary,
 } from "./quizzes";
 
-type Props = { email: string; onLogout: () => Promise<void> };
+type Props = {
+  email: string;
+  isAdmin?: boolean;
+  onLogout: () => Promise<void>;
+};
 
 function draftIsSavable(draft: QuizDraft): boolean {
   if (!draft.title.trim()) return false;
@@ -35,7 +40,7 @@ function draftIsSavable(draft: QuizDraft): boolean {
   );
 }
 
-export function QuizDashboard({ email, onLogout }: Props) {
+export function QuizDashboard({ email, isAdmin = false, onLogout }: Props) {
   const [quizzes, setQuizzes] = useState<QuizSummary[]>([]);
   const [editing, setEditing] = useState<QuizDraft>();
   const [importAnonymousDraft, setImportAnonymousDraft] = useState(false);
@@ -64,6 +69,8 @@ export function QuizDashboard({ email, onLogout }: Props) {
       const draft = loadAnonymousDraft();
       setEditing(draft ?? newQuiz());
       setImportAnonymousDraft(Boolean(draft));
+      if (!draft)
+        trackAnalytics("create_started", { path: "/dashboard?new=1" });
     }
   }, []);
   async function editQuiz(id: string) {
@@ -111,6 +118,10 @@ export function QuizDashboard({ email, onLogout }: Props) {
         setEditing({ ...draft, id: body.quiz.id });
         if (!draft.id) clearAnonymousDraft();
         setSaveState(body.pending ? "queued" : "saved");
+        trackAnalytics(draft.id ? "quiz_updated" : "quiz_created", {
+          quizId: body.quiz.id,
+          path: "/dashboard",
+        });
         await loadQuizzes();
       } else {
         setSaveState("idle");
@@ -130,6 +141,7 @@ export function QuizDashboard({ email, onLogout }: Props) {
     setSaveState("idle");
     const response = await fetch(`/api/quizzes/${id}`, { method: "DELETE" });
     if (response.ok) {
+      trackAnalytics("quiz_deleted", { quizId: id, path: "/dashboard" });
       setEditing(undefined);
       await loadQuizzes();
     } else {
@@ -159,6 +171,11 @@ export function QuizDashboard({ email, onLogout }: Props) {
           : item,
       ),
     );
+    trackAnalytics("visibility_changed", {
+      quizId: id,
+      path: "/dashboard",
+      metadata: { isPublic: body.isPublic ?? isPublic },
+    });
   }
   async function renameQuiz(id: string, title: string) {
     const response = await fetch(`/api/quizzes/${id}`);
@@ -185,6 +202,11 @@ export function QuizDashboard({ email, onLogout }: Props) {
     };
     if (!response.ok || !body.session)
       return setError(body.error ?? "Could not launch the quiz.");
+    trackAnalytics("live_session_created", {
+      quizId: id,
+      liveSessionId: body.session.id,
+      path: "/dashboard",
+    });
     navigateTo(`/host/${body.session.id}`, { notify: false });
     setHostSessionId(body.session.id);
   }
@@ -201,9 +223,13 @@ export function QuizDashboard({ email, onLogout }: Props) {
         <SiteHeader
           active="create"
           loggedIn
+          isAdmin={isAdmin}
           email={email}
           onLogout={onLogout}
-          onCreate={() => setEditing(newQuiz())}
+          onCreate={() => {
+            trackAnalytics("create_started", { path: "/dashboard" });
+            setEditing(newQuiz());
+          }}
           onMyQuizzes={() => {
             setEditing(undefined);
             setError("");
@@ -227,9 +253,13 @@ export function QuizDashboard({ email, onLogout }: Props) {
       <SiteHeader
         active="quizzes"
         loggedIn
+        isAdmin={isAdmin}
         email={email}
         onLogout={onLogout}
-        onCreate={() => setEditing(newQuiz())}
+        onCreate={() => {
+          trackAnalytics("create_started", { path: "/dashboard" });
+          setEditing(newQuiz());
+        }}
       />
       <div className="dashboard-meta">
         <p className="dashboard-visibility-help">
@@ -247,7 +277,12 @@ export function QuizDashboard({ email, onLogout }: Props) {
         <section className="empty-state">
           <h2>Your first quiz starts here</h2>
           <p>Add questions, possible answers, timing, and scores.</p>
-          <button onClick={() => setEditing(newQuiz())}>
+          <button
+            onClick={() => {
+              trackAnalytics("create_started", { path: "/dashboard" });
+              setEditing(newQuiz());
+            }}
+          >
             Create your first quiz
           </button>
         </section>
@@ -357,6 +392,10 @@ export function AnonymousQuizEditor({
   const [saveState, setSaveState] = useState<
     "idle" | "saving" | "saved" | "queued" | "local"
   >("local");
+
+  useEffect(() => {
+    trackAnalytics("create_started", { path: "/create" });
+  }, []);
 
   function updateDraft(next: QuizDraft) {
     setQuiz(next);

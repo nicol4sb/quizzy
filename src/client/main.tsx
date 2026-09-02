@@ -6,9 +6,16 @@ import { PlayerJoin } from "./PlayerJoin";
 import { RichText } from "./RichText";
 import { navigateInternally, navigateTo, SiteHeader } from "./SiteHeader";
 import { loadAnonymousDraft } from "./quizzes";
+import { trackAnalytics } from "./analytics";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import "./styles.css";
 
-type Creator = { id: string; email: string; createdAt: string };
+type Creator = {
+  id: string;
+  email: string;
+  isAdmin?: boolean;
+  createdAt: string;
+};
 type PublicQuiz = {
   id: string;
   title: string;
@@ -63,12 +70,14 @@ const studentFigures = [
 
 function PublicActivity({
   loggedIn,
+  isAdmin = false,
   email,
   onLogout,
   onLogin,
   showReelNavigation = true,
 }: {
   loggedIn: boolean;
+  isAdmin?: boolean;
   email?: string;
   onLogout?: () => Promise<void>;
   onLogin?: (register: boolean) => void;
@@ -79,6 +88,7 @@ function PublicActivity({
       <SiteHeader
         active="home"
         loggedIn={loggedIn}
+        isAdmin={isAdmin}
         email={email}
         onLogout={onLogout}
         onLogin={onLogin}
@@ -101,6 +111,7 @@ function PublicActivity({
 function MostPlayedPage({
   quizzes,
   loggedIn,
+  isAdmin = false,
   email,
   onLogout,
   onLogin,
@@ -108,6 +119,7 @@ function MostPlayedPage({
 }: {
   quizzes: PublicQuiz[];
   loggedIn: boolean;
+  isAdmin?: boolean;
   email?: string;
   onLogout?: () => Promise<void>;
   onLogin?: (register: boolean) => void;
@@ -131,6 +143,11 @@ function MostPlayedPage({
       setClassError(body.error ?? "Could not start a class quiz.");
       return;
     }
+    trackAnalytics("live_session_created", {
+      quizId,
+      liveSessionId: body.session.id,
+      path: "/popular",
+    });
     navigateTo(`/host/${body.session.id}`);
   }
   return (
@@ -138,6 +155,7 @@ function MostPlayedPage({
       <SiteHeader
         active="play"
         loggedIn={loggedIn}
+        isAdmin={isAdmin}
         email={email}
         onLogout={onLogout}
         onLogin={onLogin}
@@ -170,12 +188,14 @@ function MostPlayedPage({
 function SoloQuiz({
   quizId,
   loggedIn,
+  isAdmin = false,
   email,
   onLogout,
   onLogin,
 }: {
   quizId: string;
   loggedIn: boolean;
+  isAdmin?: boolean;
   email?: string;
   onLogout?: () => Promise<void>;
   onLogin?: (register: boolean) => void;
@@ -204,7 +224,9 @@ function SoloQuiz({
       if (!active) return;
       setQuiz(body.quiz);
       setLoading(false);
+      trackAnalytics("quiz_viewed", { quizId, path: `/play/${quizId}` });
       await fetch(`/api/public/quizzes/${quizId}/play`, { method: "POST" });
+      trackAnalytics("solo_started", { quizId, path: `/play/${quizId}` });
     }
     void load().catch(() => {
       if (active) {
@@ -221,6 +243,7 @@ function SoloQuiz({
     <SiteHeader
       active="play"
       loggedIn={loggedIn}
+      isAdmin={isAdmin}
       email={email}
       onLogout={onLogout}
       onLogin={onLogin}
@@ -934,6 +957,9 @@ function App() {
     window.addEventListener("popstate", syncRoute);
     return () => window.removeEventListener("popstate", syncRoute);
   }, []);
+  useEffect(() => {
+    trackAnalytics("page_view", { path: pathname });
+  }, [pathname]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1009,6 +1035,7 @@ function App() {
 
   const publicPath = ["/", "/public", "/public/"].includes(pathname);
   const popularPath = ["/popular", "/popular/"].includes(pathname);
+  const analyticsPath = ["/analytics", "/analytics/"].includes(pathname);
   const anonymousCreatePath = ["/create", "/create/"].includes(pathname);
   const soloQuizId = pathname.match(/^\/play\/([0-9a-f-]+)$/i)?.[1];
   if (soloQuizId && !loginOpen)
@@ -1016,6 +1043,7 @@ function App() {
       <SoloQuiz
         quizId={soloQuizId}
         loggedIn={Boolean(creator)}
+        isAdmin={Boolean(creator?.isAdmin)}
         email={creator?.email}
         onLogout={logout}
         onLogin={openLogin}
@@ -1027,6 +1055,7 @@ function App() {
         quizzes={publicQuizzes}
         myPublicQuizzes={myPublicQuizzes}
         loggedIn={Boolean(creator)}
+        isAdmin={Boolean(creator?.isAdmin)}
         email={creator?.email}
         onLogout={logout}
         onLogin={openLogin}
@@ -1036,6 +1065,7 @@ function App() {
     return (
       <PublicActivity
         loggedIn={Boolean(creator)}
+        isAdmin={Boolean(creator?.isAdmin)}
         email={creator?.email}
         onLogout={logout}
         onLogin={openLogin}
@@ -1046,7 +1076,15 @@ function App() {
     return <AnonymousQuizEditor onLogin={openLogin} />;
 
   if (creator) {
-    return <QuizDashboard email={creator.email} onLogout={logout} />;
+    if (analyticsPath && creator.isAdmin)
+      return <AnalyticsDashboard email={creator.email} onLogout={logout} />;
+    return (
+      <QuizDashboard
+        email={creator.email}
+        isAdmin={creator.isAdmin}
+        onLogout={logout}
+      />
+    );
   }
 
   if (!loginOpen)

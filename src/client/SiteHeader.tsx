@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 
-export type SiteSection = "home" | "play" | "create" | "quizzes";
+export type SiteSection = "home" | "play" | "create" | "quizzes" | "analytics";
 
 /**
  * Change an application route without asking the browser to download the
@@ -40,6 +40,7 @@ export function navigateInternally(
 type Props = {
   active: SiteSection;
   loggedIn: boolean;
+  isAdmin?: boolean;
   email?: string;
   onLogout?: () => Promise<void>;
   onLogin?: (register: boolean) => void;
@@ -52,6 +53,7 @@ type Props = {
 export function SiteHeader({
   active,
   loggedIn,
+  isAdmin = false,
   email,
   onLogout,
   onLogin,
@@ -152,6 +154,16 @@ export function SiteHeader({
           >
             My quizzes
           </button>
+        )}
+        {loggedIn && isAdmin && (
+          <a
+            className={navClass("analytics")}
+            href="/analytics"
+            onClick={(event) => navigateInternally(event, "/analytics")}
+            aria-current={active === "analytics" ? "page" : undefined}
+          >
+            Analytics
+          </a>
         )}
       </nav>
       <div className="dashboard-header-extra">

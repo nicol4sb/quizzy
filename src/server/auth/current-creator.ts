@@ -1,7 +1,12 @@
 import type { Database } from "../database/types.js";
 import { hashSessionToken } from "./session.js";
 
-export type Creator = { id: string; email: string; created_at: Date };
+export type Creator = {
+  id: string;
+  email: string;
+  is_admin: boolean;
+  created_at: Date;
+};
 
 export async function findCurrentCreator(
   database: Database,
@@ -9,7 +14,7 @@ export async function findCurrentCreator(
 ): Promise<Creator | undefined> {
   if (!token) return undefined;
   const result = await database.query<Creator>(
-    `SELECT c.id, c.email, c.created_at
+    `SELECT c.id, c.email, c.is_admin, c.created_at
        FROM creator_sessions s
        JOIN creators c ON c.id = s.creator_id
       WHERE s.token_hash = $1 AND s.expires_at > now()`,
